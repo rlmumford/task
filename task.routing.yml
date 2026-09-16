@@ -1,0 +1,15 @@
+task.admin_config_task:
+  path: '/admin/config/task'
+  defaults:
+    _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
+    _title: 'Tasks'
+  requirements:
+    _permission: 'access administration pages'
+entity.task.configuration:
+  path: '/admin/config/task/structure'
+  defaults:
+    _form: '\Drupal\task\Form\TaskConfigurationForm'
+    _title: 'Task Structure'
+  requirements:
+    _permission: 'administer tasks'
+

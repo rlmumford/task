@@ -1,0 +1,7 @@
+task_checklist.defaults:
+  type: mapping
+  label: 'Defaults Configuration for Task Checklist'
+  mapping:
+    ci_name_prefix:
+      type: string
+      label: 'Checklist Item Name Prefix'

@@ -1,0 +1,10 @@
+name: Task Checklist
+description: Task checklists
+type: module
+package: Tasks
+core_version_requirement: ^10 || ^11
+
+dependencies:
+  - task:task
+  - checklist:checklist
+  - entity:entity

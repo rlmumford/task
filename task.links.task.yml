@@ -1,0 +1,4 @@
+entity.task.configuration:
+  route_name: entity.task.configuration
+  title: 'Settings'
+  base_route: entity.task.configuration

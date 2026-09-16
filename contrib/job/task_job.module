@@ -1,0 +1,184 @@
+<?php
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function task_job_entity_base_field_info(EntityTypeInterface $entity_type) {
+  $fields = [];
+
+  if ($entity_type->id() == 'task') {
+    $fields['job'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(new TranslatableMarkup('Job'))
+      ->setDescription(new TranslatableMarkup('The Job'))
+      ->setSetting('target_type', 'task_job')
+      ->setDisplayConfigurable('view', TRUE)
+      ->setDisplayConfigurable('form', TRUE);
+  }
+
+  return $fields;
+}
+
+/**
+ * Implements hook_entity_base_field_info_alter().
+ */
+function task_job_entity_base_field_info_alter(&$fields, EntityTypeInterface $entity_type) {
+  if ($entity_type->id() === 'task' && isset($fields['checklist'])) {
+    $fields['checklist']->setDefaultValueCallback('_task_job_task_checklist_default_value');
+  }
+}
+
+/**
+ * Default value callback to set the checklist value when a task job is set.
+ *
+ * @param \Drupal\task\Entity\Task $task
+ *   The task
+ */
+function _task_job_task_checklist_default_value(EntityInterface $task) {
+  if (!$task->job->isEmpty()) {
+    return [
+      'id' => 'job',
+      'configuration' => [
+        'job' => $task->job->target_id,
+      ]
+    ];
+  }
+
+  return NULL;
+}
+
+/**
+ * Implements hook_typed_data_reference_property_definitions().
+ */
+function task_job_typed_data_reference_property_definitions(FieldItemListInterface $item_list) {
+  $definitions = [];
+
+  $entity = $item_list->getEntity();
+  if (
+    $item_list->getFieldDefinition()->getName() === 'context' &&
+    $item_list->getFieldDefinition()->getTargetEntityTypeId() === 'task' &&
+    $entity->hasField('job') &&
+    !$entity->get('job')->isEmpty()
+  ) {
+    /** @var \Drupal\task_job\Entity\Job $job */
+    $job = $entity->job->entity;
+    foreach ($job->getContextDefinitions() as $key => $definition) {
+      $definitions[$key] = $definition->getDataDefinition();
+    }
+  }
+
+  return $definitions;
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function task_job_entity_insert(EntityInterface $entity) {
+  _task_job_trigger_entity_operation('insert', $entity);
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function task_job_entity_update(EntityInterface $entity) {
+  _task_job_trigger_entity_operation('update', $entity);
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function task_job_entity_delete(EntityInterface $entity) {
+  _task_job_trigger_entity_operation('delete', $entity);
+}
+
+/**
+ * Trigger the entity operation triggers.
+ *
+ * @param string $op
+ *   The operation.
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *   The entity.
+ */
+function _task_job_trigger_entity_operation(string $op, EntityInterface $entity) {
+  try {
+    $plugin_id = "entity_op:{$entity->getEntityTypeId()}.{$op}";
+    /** @var \Drupal\task_job\Plugin\JobTrigger\JobTriggerManagerInterface $manager */
+    $manager = \Drupal::service('plugin.manager.task_job.trigger');
+    $manager->handleTrigger(
+      $plugin_id,
+      array_filter([
+        $entity->getEntityTypeId() => $entity,
+        "original_{$entity->getEntityTypeId()}" => isset($entity->original) ? $entity->original : NULL,
+      ])
+    );
+  }
+  catch (Exception $e) {
+    \Drupal::logger('task_job')->error($e->getMessage());
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for task_form.
+ */
+function task_job_form_task_form_alter(array &$form, FormStateInterface $form_state) {
+  $task = $form_state->getFormObject()->getEntity();
+
+  if (!$task->job->isEmpty() && $task->isNew()) {
+    if (!$task->title->isEmpty()) {
+      $form['title']['widget'][0]['value']['#disabled'] = TRUE;
+    }
+    if (!$task->description->isEmpty()) {
+      $form['description']['widget'][0]['#disabled'] = TRUE;
+    }
+
+    if (empty($form['checklist']) && $task->job->entity->getChecklistItems()) {
+      $form['checklist'] = $task->checklist->view([
+        'type' => 'checklist_preview',
+      ]);
+      $form['checklist']['#weight'] = $form['description']['#weight'];
+    }
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_prepare_form() for tasks.
+ *
+ * If we are creating an the job does not have checklist items, expose the
+ * simple checklist widget.
+ */
+function task_job_task_prepare_form(EntityInterface $task, string $op, FormStateInterface $form_state) {
+  /** @var \Drupal\Core\Entity\Display\EntityFormDisplayInterface $form_display */
+  $form_display = $form_state->get('form_display');
+
+  if ($task->isNew() && !$task->job->isEmpty() && !$task->job->entity->getChecklistItems()) {
+    $form_display->setComponent('checklist', [
+      'type' => 'checklist_simple',
+      'weight' => $form_display->getComponent('description')['weight'] ?? 5,
+    ]);
+  }
+}
+
+/**
+ * Implement hook_plugin_filter_PLUGIN_TYPE__CONSUMER() for block and task_job_resource.
+ *
+ * Some block plugins make no sense as resources. Remove them.
+ */
+function task_job_plugin_filter_block__task_job_resource_alter(array &$definitions) {
+  $blacklist = [
+    'system_menu_block', 'system_powered_by_block', 'shortcuts',
+    'system_breadcrumb_block', 'system_messages_block', 'system_main_block',
+    'system_branding_block', 'task_resources', 'user_login_block', 'broken',
+    'page_title_block', 'local_actions_block', 'local_tasks_block',
+  ];
+  foreach ($definitions as $id => $definition) {
+    if (in_array($id, $blacklist) || in_array($definition['id'], $blacklist)) {
+      unset($definitions[$id]);
+    }
+  }
+}

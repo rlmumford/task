@@ -1,0 +1,4 @@
+services:
+  task.resource_manager:
+    class: '\Drupal\task\TaskResourceManager'
+    arguments: [ '@event_dispatcher', '@context.handler', '@current_user', '@module_handler', '@plugin.manager.block' ]

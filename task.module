@@ -1,0 +1,145 @@
+<?php
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+
+/**
+ * Implements hook_cron().
+ */
+function task_cron() {
+  // Queue due tasks so checklist processing does not hold up cron. The worker
+  // reloads the task: duplicate queue items cannot release a manual hold.
+  $storage = \Drupal::entityTypeManager()->getStorage('task');
+  $state = \Drupal::state();
+  $cursor = $state->get('task.scheduler_cursor', 0);
+  $ids = $storage->getQuery()
+    ->accessCheck(FALSE)
+    ->condition('status', 'pending')
+    ->condition('id', $cursor, '>')
+    ->condition('start', gmdate('Y-m-d\TH:i:s', \Drupal::time()->getRequestTime()), '<=')
+    ->sort('id')
+    ->range(0, 100)
+    ->execute();
+  foreach ($ids as $id) {
+    \Drupal::queue('task_scheduled')->createItem($id);
+  }
+  // Rotate through blocked tasks as well; a full first batch of dependencies
+  // must not starve later due tasks on every cron run.
+  $state->set('task.scheduler_cursor', count($ids) === 100 ? max($ids) : 0);
+}
+
+/**
+ * Implements hook_entity_type_build().
+ *
+ * @param \Drupal\Core\Entity\EntityTypeInterface[] $entity_types
+ *   The entity types to be built.
+ */
+function task_entity_type_build(&$entity_types) {
+  if (\Drupal::moduleHandler()->moduleExists('exec_environment')) {
+    $entity_types['task']->setViewBuilderClass(\Drupal\exec_environment\EnvironmentAwareViewBuilder::class);
+  }
+}
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function task_entity_base_field_info(EntityTypeInterface $entity_type) {
+  $fields = [];
+
+  if ($entity_type->id() === 'message') {
+    $fields['task'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(new TranslatableMarkup('Task'))
+      ->setSetting('target_type', 'task')
+      ->setDisplayConfigurable('view', TRUE)
+      ->setDisplayConfigurable('form', TRUE);
+    $fields['root_task'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(new TranslatableMarkup('Root Task'))
+      ->setSetting('target_type', 'task')
+      ->setDisplayConfigurable('view', TRUE)
+      ->setDisplayConfigurable('form', TRUE);
+  }
+
+  if ($entity_type->id() === 'note') {
+    $fields['root_task'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(new TranslatableMarkup('Root Task'))
+      ->setSetting('target_type', 'task')
+      ->setSetting('note_attachment_field', TRUE)
+      ->setDisplayConfigurable('view', TRUE)
+      ->setDisplayConfigurable('form', TRUE);
+  }
+
+  return $fields;
+}
+
+/**
+ * Implements hook_message_presave().
+ */
+function task_message_presave(EntityInterface $message) {
+  /** @var \Drupal\message\MessageInterface $message */
+  if (!$message->task->isEmpty()) {
+    $message->root_task = $message->task->entity->root->getValue();
+  }
+}
+
+/**
+ * Implements hook_note_presave().
+ */
+function task_note_presave(EntityInterface $note) {
+  if (!$note->task->isEmpty()) {
+    $note->root_task = $note->task->entity->root->getValue();
+  }
+}
+
+/**
+ * Implements hook_modules_installed().
+ */
+function task_modules_installed($modules) {
+  if (in_array('note', $modules)) {
+    \Drupal::entityDefinitionUpdateManager()->installFieldStorageDefinition(
+      'root_task',
+      'note',
+      'task',
+      BaseFieldDefinition::create('entity_reference')
+        ->setLabel(new TranslatableMarkup('Root Task'))
+        ->setSetting('target_type', 'task')
+        ->setSetting('note_attachment_field', TRUE)
+        ->setDisplayConfigurable('view', TRUE)
+        ->setDisplayConfigurable('form', TRUE)
+    );
+  }
+
+  if (!in_array('message', $modules)) {
+    return;
+  }
+
+  /** @var \Drupal\Core\Field\FieldStorageDefinitionListenerInterface $storage_definition_listener */
+  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
+  /** @var \Drupal\Core\Field\FieldDefinitionListenerInterface $field_definition_listener */
+  $field_definition_listener = \Drupal::service('field_definition.listener');
+
+  $fields['task'] = BaseFieldDefinition::create('entity_reference')
+    ->setLabel(new TranslatableMarkup('Task'))
+    ->setSetting('target_type', 'task')
+    ->setDisplayConfigurable('view', TRUE)
+    ->setDisplayConfigurable('form', TRUE);
+  $fields['root_task'] = BaseFieldDefinition::create('entity_reference')
+    ->setLabel(new TranslatableMarkup('Root Task'))
+    ->setSetting('target_type', 'task')
+    ->setDisplayConfigurable('view', TRUE)
+    ->setDisplayConfigurable('form', TRUE);
+
+  /**
+   * @var string $name
+   * @var \Drupal\Core\Field\BaseFieldDefinition $definition
+   */
+  foreach ($fields as $name => $definition) {
+    $definition->setTargetEntityTypeId('message');
+    $definition->setName($name);
+    $definition->setProvider('task');
+
+    $storage_definition_listener->onFieldStorageDefinitionCreate($definition);
+    $field_definition_listener->onFieldDefinitionCreate($definition);
+  }
+}

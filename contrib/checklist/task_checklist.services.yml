@@ -1,0 +1,8 @@
+services:
+  task_checklist.task_processor:
+    class: Drupal\task_checklist\TaskChecklistProcessor
+    arguments: [ '@module_handler', '@event_dispatcher', '@logger.factory' ]
+  task_checklist.task_checklist.subscriber:
+    class: Drupal\task_checklist\EventSubscriber\TaskChecklistSubscriber
+    tags:
+      - { name: event_subscriber }

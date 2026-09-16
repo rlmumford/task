@@ -1,0 +1,12 @@
+task.admin_config_task:
+  title: 'Task Management'
+  parent: system.admin_config
+  description: 'Configure tasks.'
+  weight: -10
+  route_name: task.admin_config_task
+entity.task.configuration:
+  title: 'Task Structure'
+  parent: task.admin_config_task
+  description: 'Configure task fields & displays.'
+  weight: -10
+  route_name: entity.task.configuration

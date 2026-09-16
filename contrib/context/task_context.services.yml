@@ -1,0 +1,9 @@
+services:
+  task_context.collect_resources_contexts_subscriber:
+    class: '\Drupal\task_context\EventSubscriber\TaskResourceCollectResourcesContextsSubscriber'
+    tags:
+      - { name: event_subscriber }
+  task_context.collect_checklist_contexts_subscriber:
+    class: '\Drupal\task_context\EventSubscriber\TaskChecklistCollectContextsSubscriber'
+    tags:
+      - { name: event_subscriber }

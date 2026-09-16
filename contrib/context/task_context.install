@@ -1,0 +1,35 @@
+<?php
+
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+
+/**
+ * Implements hook_install().
+ */
+function task_context_install() {
+  \Drupal::entityDefinitionUpdateManager()
+    ->installFieldStorageDefinition(
+      'context',
+      'task',
+      'task_context',
+      BaseFieldDefinition::create('typed_data_reference')
+        ->setLabel(new TranslatableMarkup('Contexts'))
+        ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+    );
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function task_context_uninstall() {
+  \Drupal::entityDefinitionUpdateManager()
+    ->uninstallFieldStorageDefinition(
+      BaseFieldDefinition::create('typed_data_reference')
+        ->setLabel(new TranslatableMarkup('Contexts'))
+        ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+        ->setTargetEntityTypeId('task')
+        ->setName('context')
+        ->setProvider('task_context')
+    );
+}

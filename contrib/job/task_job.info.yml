@@ -1,0 +1,15 @@
+name: Task Job
+description: Store task jobs
+type: module
+package: Tasks
+core_version_requirement: ^10 || ^11
+
+dependencies:
+  - task:task
+  - task:task_context
+  - task:task_checklist
+  - checklist:checklist
+  - entity:entity
+  - entity_template:entity_template
+  - entity_template:entity_template_ui
+  - drupal:views

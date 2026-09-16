@@ -1,0 +1,227 @@
+<?php
+
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+
+/**
+ * Implements hook_schema().
+ */
+function task_job_schema() {
+  $schema = [];
+
+  $schema['task_job_trigger_index'] = [
+    'description' => 'Track which triggers are used by which jobs.',
+    'fields' => [
+      'job' => [
+        'description' => 'Job ID.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+      'trigger' => [
+        'description' => 'The trigger plugin id.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+      'trigger_base' => [
+        'description' => 'The trigger base plugin id.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+      'trigger_key' => [
+        'description' => 'The key of the trigger',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+      'collection' => [
+        'description' => 'The config collection of the job',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+    ],
+    'primary key' => ['job', 'trigger_key', 'collection'],
+    'indexes' => [
+      'trigger' => ['trigger'],
+      'trigger_base' => ['trigger_base'],
+      'job' => ['job'],
+      'trigger_key' => ['trigger_key'],
+      'collection' => ['collection'],
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function task_job_install() {
+  /** @var \Drupal\Core\Field\FieldStorageDefinitionListenerInterface $storage_definition_listener */
+  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
+  /** @var \Drupal\Core\Field\FieldDefinitionListenerInterface $definition_listener */
+  $definition_listener = \Drupal::service('field_definition.listener');
+
+  $definition = BaseFieldDefinition::create('entity_reference')
+    ->setName('job')
+    ->setProvider('task_job')
+    ->setTargetEntityTypeId('task')
+    ->setLabel(new TranslatableMarkup('Job'))
+    ->setDescription(new TranslatableMarkup('The Job'))
+    ->setSetting('target_type', 'task_job')
+    ->setDisplayConfigurable('view', TRUE)
+    ->setDisplayConfigurable('form', TRUE);
+
+  $storage_definition_listener->onFieldStorageDefinitionCreate($definition);
+  $definition_listener->onFieldDefinitionCreate($definition);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function task_job_uninstall() {
+  /** @var \Drupal\Core\Field\FieldStorageDefinitionListenerInterface $storage_definition_listener */
+  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
+  /** @var \Drupal\Core\Field\FieldDefinitionListenerInterface $definition_listener */
+  $definition_listener = \Drupal::service('field_definition.listener');
+
+  $definition = BaseFieldDefinition::create('entity_reference')
+    ->setName('job')
+    ->setProvider('task_job')
+    ->setTargetEntityTypeId('task')
+    ->setLabel(new TranslatableMarkup('Job'))
+    ->setDescription(new TranslatableMarkup('The Job'))
+    ->setSetting('target_type', 'task_job')
+    ->setDisplayConfigurable('view', TRUE)
+    ->setDisplayConfigurable('form', TRUE);
+
+  $storage_definition_listener->onFieldStorageDefinitionDelete($definition);
+  $definition_listener->onFieldDefinitionDelete($definition);
+}
+
+/**
+ * Install the job trigger table.
+ */
+function task_job_update_8001() {
+  $schema = [
+    'description' => 'Track which triggers are used by which jobs.',
+    'fields' => [
+      'job' => [
+        'description' => 'Job ID.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+      'trigger' => [
+        'description' => 'The trigger plugin id.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+      'trigger_key' => [
+        'description' => 'The key of the trigger',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+    ],
+    'primary key' => ['job', 'trigger', 'trigger_key'],
+    'indexes' => [
+      'trigger' => ['trigger'],
+      'job' => ['job'],
+      'trigger_key' => ['trigger_key'],
+    ],
+  ];
+  \Drupal::database()->schema()->createTable(
+    'task_job_trigger_index',
+    $schema
+  );
+}
+
+/**
+ * Add base plugin id to the triggers index table.
+ */
+function task_job_update_8002() {
+  \Drupal::database()->schema()->addField(
+    'task_job_trigger_index',
+    'trigger_base',
+    [
+      'description' => 'The trigger base plugin id.',
+      'type' => 'varchar',
+      'length' => 255,
+      'not null' => TRUE,
+      'default' => '',
+    ]
+  );
+  \Drupal::database()->schema()->addIndex(
+    'task_job_trigger_index',
+    'trigger_base',
+    ['trigger_base'],
+    [
+      'fields' => [
+        'trigger_base' => [
+          'description' => 'The trigger base plugin id.',
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE,
+          'default' => '',
+        ],
+      ],
+    ]
+  );
+}
+
+/**
+ * Add base plugin id to the triggers index table.
+ */
+function task_job_update_8003() {
+  \Drupal::database()->schema()->addField(
+    'task_job_trigger_index',
+    'collection',
+    [
+      'description' => 'The config collection of the job.',
+      'type' => 'varchar',
+      'length' => 255,
+      'not null' => TRUE,
+      'default' => '',
+    ]
+  );
+  \Drupal::database()->schema()->addIndex(
+    'task_job_trigger_index',
+    'collection',
+    ['collection'],
+    [
+      'fields' => [
+        'collection' =>  [
+          'description' => 'The config collection of the job.',
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE,
+          'default' => '',
+        ],
+      ],
+    ]
+  );
+}
+
+/**
+ * Add collection to the trigger index primary key.
+ */
+function task_job_update_8004() {
+  \Drupal::database()->schema()->dropPrimaryKey('task_job_trigger_index');
+  \Drupal::database()->schema()->addPrimaryKey(
+    'task_job_trigger_index',
+    ['job', 'trigger_key', 'collection']
+  );
+}

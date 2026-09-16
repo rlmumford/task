@@ -1,0 +1,99 @@
+task_job.resource.choose_block:
+  path: '/admin/config/task/job/{task_job}/resource/choose'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\ChooseBlockController::build'
+    _title: 'Choose a Resource'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.resource.add:
+  path: '/admin/config/task/job/{task_job}/resource/add/{plugin_id}'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobAddResourceForm'
+    _title: 'Add a Resource'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.resource.configure:
+  path: '/admin/config/task/job/{task_job}/resource/{uuid}/configure'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobConfigureResourceForm'
+    _title: 'Configure Resource'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.resource.remove:
+  path: '/admin/config/task/job/{task_job}/resource/{uuid}/remove'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobRemoveResourceForm'
+    _title: 'Remove Resource'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.checklist_item.choose_handler:
+  path: '/admin/config/task/job/{task_job}/checklist/choose'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\ChooseHandlerController::build'
+    _title: 'Choose a Checklist Item Handler'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.checklist_item.add:
+  path: '/admin/config/task/job/{task_job}/checklist/add/{handler}'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobAddChecklistItemForm'
+    _title: 'Add Checklist Item'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.checklist_item.configure:
+  path: '/admin/config/task/job/{task_job}/checklist/{name}/configure'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobConfigureChecklistItemForm'
+    _title: 'Configure Checklist Item'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.checklist_item.remove:
+  path: '/admin/config/task/job/{task_job}/checklist/{name}/remove'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobRemoveChecklistItemForm'
+    _title: 'Remove Checklist Item'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.trigger.choose:
+  path: '/admin/config/task/job/{task_job}/trigger/choose'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\ChooseTriggerController::build'
+    _title: 'Choose a Trigger'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.trigger.add:
+  path: '/admin/config/task/job/{task_job}/trigger/add/{plugin_id}'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobAddTriggerForm'
+    _title: 'Add a Trigger'
+  requirements:
+    _entity_access: 'task_job.update'
+task_job.task.add_form.select_job:
+  path: '/task/add/job'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\TaskAddController::selectJob'
+    _title: 'Select Job'
+  requirements:
+    _entity_create_access: 'task'
+task_job.task.add_form:
+  path: '/task/add/job/{task_job}'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\TaskAddController::createTask'
+    _title: 'Add Task'
+  requirements:
+    _entity_create_access: 'task'
+task_job.task_board.task.add_form.select_job:
+  path: '/board/add/job'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\TaskAddController::selectJobForAssignee'
+    _title: 'Select Job'
+  requirements:
+    _entity_create_access: 'task'
+task_job.task_board.task.add_form:
+  path: '/board/add/job/{task_job}'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\TaskAddController::createTaskForAssignee'
+    _title: 'Add Task'
+  requirements:
+    _entity_create_access: 'task'
+

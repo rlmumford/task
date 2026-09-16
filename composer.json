@@ -1,0 +1,14 @@
+{
+    "name": "rlmumford/task",
+    "description": "Reusable task module extracted from rlmumford/common.",
+    "type": "drupal-module",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "drupal/core": "^10 || ^11",
+        "drupal/entity": "^1.4",
+        "drupal/entity_template": "^1.0@alpha",
+        "rlmumford/checklist": "2.x-dev",
+        "rlmumford/typed_data_reference": "2.x-dev",
+        "php": ">=8.1"
+    }
+}

@@ -1,0 +1,45 @@
+<?php
+
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\entity\BundleFieldDefinition;
+
+/**
+ * Implements hook_install().
+ */
+function task_checklist_install() {
+  /** @var \Drupal\Core\Field\FieldStorageDefinitionListenerInterface $storage_definition_listener */
+  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
+  /** @var \Drupal\Core\Field\FieldDefinitionListenerInterface $definition_listener */
+  $definition_listener = \Drupal::service('field_definition.listener');
+
+  $definition = BundleFieldDefinition::create('checklist')
+    ->setName('checklist')
+    ->setProvider('task_checklist')
+    ->setTargetEntityTypeId('task')
+    ->setLabel(new TranslatableMarkup('Checklist'))
+    ->setDisplayConfigurable('view', TRUE);
+
+  $storage_definition_listener->onFieldStorageDefinitionCreate($definition);
+  $definition_listener->onFieldDefinitionCreate($definition);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function task_checklist_uninstall() {
+  /** @var \Drupal\Core\Field\FieldStorageDefinitionListenerInterface $storage_definition_listener */
+  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
+  /** @var \Drupal\Core\Field\FieldDefinitionListenerInterface $definition_listener */
+  $definition_listener = \Drupal::service('field_definition.listener');
+
+  $definition = BundleFieldDefinition::create('checklist')
+    ->setName('checklist')
+    ->setProvider('task_checklist')
+    ->setTargetEntityTypeId('task')
+    ->setLabel(new TranslatableMarkup('Checklist'))
+    ->setDisplayConfigurable('view', TRUE);
+
+
+  $storage_definition_listener->onFieldStorageDefinitionDelete($definition);
+  $definition_listener->onFieldDefinitionDelete($definition);
+}

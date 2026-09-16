@@ -1,0 +1,20 @@
+<?php
+
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\typed_data_reference\TypedDataReferenceItemList;
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function task_context_entity_base_field_info(EntityTypeInterface $entity_type) {
+  if ($entity_type->id() === 'task') {
+    return [
+      'context' => BaseFieldDefinition::create('typed_data_reference')
+        ->setLabel(new TranslatableMarkup('Contexts'))
+        ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+    ];
+  }
+}

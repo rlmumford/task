@@ -1,0 +1,95 @@
+task_job.task_job.*:
+  type: config_entity
+  label: 'Task Job'
+  mapping:
+    id:
+      type: string
+      label: 'Machine-readable name'
+    label:
+      type: label
+      label: 'Label'
+    description:
+      type: text
+      label: 'Description'
+    assignment:
+      type: string
+      label: 'Default assignment rule'
+    context:
+      type: sequence
+      label: 'Task Contexts'
+      sequence:
+        - type: mapping
+          label: 'Task Context'
+          mapping:
+            type:
+              type: string
+              label: 'The data type'
+            label:
+              type: label
+              label: 'The context label'
+            required:
+              type: boolean
+              label: 'Whether this context is required.'
+            multiple:
+              type: boolean
+              label: 'Whether this context can have multiple values.'
+            description:
+              type: string
+              label: 'A description of the context'
+    resources:
+      type: sequence
+      sequence:
+        type: block.settings.[id]
+    default_checklist:
+      type: sequence
+      label: 'Default chacklist'
+      sequence:
+        - type: mapping
+          label: 'Checklist Item'
+          mapping:
+            name:
+              type: string
+              label: 'The short name or key'
+            label:
+              type: label
+              label: 'The label of the item'
+            handler:
+              type: string
+              label: 'The handler plugin id.'
+            handler_configuration:
+              type: checklist_item_handler.[%parent.handler]
+              label: 'The handler configuration.'
+    triggers:
+      type: sequence
+      label: 'Triggers'
+      sequence:
+        - type: task_job.trigger.[id]
+          label: 'Trigger'
+
+task_job.trigger:
+  type: mapping
+  mapping:
+    id:
+      type: string
+      label: 'The trigger plugin id'
+    key:
+      type: string
+      label: 'The trigger key'
+    label:
+      type: label
+      label: 'The trigger description'
+    template:
+      type: entity_template.template.[id]
+      label: 'Template'
+
+task_job.trigger.*:
+  type: task_job.trigger
+  label: 'Job Trigger'
+
+task_job.trigger.manual:
+  type: task_job.trigger
+  label: 'Manual Trigger Handler Settings'
+
+
+
+

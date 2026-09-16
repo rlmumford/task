@@ -1,0 +1,16 @@
+administer tasks:
+  title: Administer tasks
+  restrict access: true
+administer task bundles:
+  title: Administer task bundles
+  restrict access: true
+create tasks:
+  title: Create new tasks
+view any tasks:
+  title: View any tasks
+view assigned tasks:
+  title: View assigned tasks
+update any tasks:
+  title: Update any tasks
+update assigned tasks:
+  title: Update assigned tasks.

@@ -1,0 +1,15 @@
+services:
+  task_job.assignment_subscriber:
+    class: Drupal\task_job\EventSubscriber\AssignmentSubscriber
+    tags:
+      - { name: event_subscriber }
+  task_job.tempstore_repository:
+    class: Drupal\task_job\TaskJobTempstoreRepository
+    arguments: ['@tempstore.shared']
+  task_job.collect_resources_subscriber:
+    class: Drupal\task_job\EventSubscriber\CollectResourcesSubscriber
+    tags:
+      - { name: event_subscriber }
+  plugin.manager.task_job.trigger:
+    class: Drupal\task_job\Plugin\JobTrigger\JobTriggerManager
+    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@database', '@entity_type.manager', '@logger.factory']

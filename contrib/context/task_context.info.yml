@@ -1,0 +1,9 @@
+name: Task Context
+description: Allow tasks to have contexts.
+type: module
+package: Tasks
+core_version_requirement: ^10 || ^11
+
+dependencies:
+  - task:task
+  - typed_data_reference:typed_data_reference

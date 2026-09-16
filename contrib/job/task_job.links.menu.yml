@@ -1,0 +1,6 @@
+entity.task_job.collection:
+  title: 'Jobs'
+  parent: task.admin_config_task
+  description: 'Configure task jobs and checklists.'
+  weight: -10
+  route_name: entity.task_job.collection

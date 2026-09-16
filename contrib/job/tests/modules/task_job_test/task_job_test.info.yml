@@ -1,0 +1,6 @@
+type: module
+name: Task Job Test
+description: Helpful things for task_job tests.
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task_job

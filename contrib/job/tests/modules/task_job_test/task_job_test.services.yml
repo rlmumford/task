@@ -1,0 +1,6 @@
+services:
+  task_job_test.handle_trigger_event_subscriber:
+    class: Drupal\task_job_test\EventSubscriber\TaskJobTriggerSubscriber
+    arguments: [ '@plugin.manager.exec_environment_component',  '@current_user', '@state' ]
+    tags:
+      - { name: event_subscriber }

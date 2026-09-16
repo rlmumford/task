@@ -1,0 +1,8 @@
+name: Task Checklist Sample
+description: Sample for simple task checklists
+type: module
+core_version_requirement: ^10 || ^11
+package: Tasks
+dependencies:
+  - task:task
+  - task:task_checklist
