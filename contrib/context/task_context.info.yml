@@ -6,4 +6,4 @@ core_version_requirement: ^10 || ^11
 
 dependencies:
   - task:task
-  - typed_data_reference:typed_data_reference
+  - typed_data_plus:typed_data_reference

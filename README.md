@@ -7,7 +7,7 @@ repository is an automated split output.
 Enable `task_job` for jobs, task contexts, and programmable checklists. Enable
 the separate `service` and `note` modules for work containers and comments.
 The supporting packages are `rlmumford/checklist`, `plugin_reference`,
-`typed_data_reference`, and `typed_data_context_assignment`.
+`typed_data_plus`.
 
 ## Behavior
 
