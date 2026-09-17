@@ -3,6 +3,7 @@
 namespace Drupal\Tests\task\Kernel;
 
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\Core\Entity\EntityStorageException;
 use Drupal\note\Entity\Note;
 use Drupal\service\Entity\Service;
 use Drupal\service\Entity\ServiceType;
@@ -33,6 +34,8 @@ class TaskIntegrationTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installSchema('service', ['service_hierarchy_lock']);
+    $this->container->get('database')->insert('service_hierarchy_lock')->fields(['id' => 1])->execute();
     $this->installSchema('task_job', ['task_job_trigger_index']);
     foreach (['user', 'note', 'service', 'task', 'checklist_item'] as $type) {
       $this->installEntitySchema($type);
@@ -98,6 +101,42 @@ class TaskIntegrationTest extends KernelTestBase {
     $task = Task::create(['title' => 'Unassigned', 'job' => $job, 'creator' => $creator]);
     $task->save();
     $this->assertTrue($task->assignee->isEmpty());
+  }
+
+  /**
+   * Services cannot be deleted until current task references are removed.
+   */
+  public function testServiceDeletionWithTask(): void {
+    ServiceType::create(['id' => 'work', 'label' => 'Work'])->save();
+    $service = Service::create(['type' => 'work', 'label' => 'Parent']);
+    $service->save();
+    $task = Task::create(['title' => 'Dependent work', 'service' => $service]);
+    $task->save();
+    try {
+      $service->delete();
+      $this->fail('A task reference must prevent deletion.');
+    }
+    catch (EntityStorageException $exception) {
+      $this->assertStringContainsString('dependent', $exception->getMessage());
+    }
+    $task->set('service', NULL)->save();
+    $service->delete();
+    $this->assertNull(Service::load($service->id()));
+    $this->assertNotNull(Task::load($task->id()));
+  }
+
+  /**
+   * Task writes cannot attach to a deleted service through a cached reference.
+   */
+  public function testTaskWithDeletedService(): void {
+    ServiceType::create(['id' => 'work', 'label' => 'Work'])->save();
+    $service = Service::create(['type' => 'work', 'label' => 'Parent']);
+    $service->save();
+    $task = Task::create(['title' => 'Work', 'service' => $service]);
+    $service->delete();
+    $this->expectException(EntityStorageException::class);
+    $this->expectExceptionMessage('missing');
+    $task->save();
   }
 
 }

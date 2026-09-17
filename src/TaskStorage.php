@@ -42,6 +42,8 @@ class TaskStorage extends SqlContentEntityStorage {
    * {@inheritdoc}
    */
   protected function doSaveFieldItems(ContentEntityInterface $entity, array $names = []) {
+    // Storage validators run inside the transaction, after all presave hooks.
+    $this->moduleHandler()->invokeAll('task_storage_prewrite', [$entity]);
     parent::doSaveFieldItems($entity, $names);
 
     if ($entity->root->isEmpty()) {
