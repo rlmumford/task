@@ -12,7 +12,7 @@ interface TaskInterface extends FieldableEntityInterface {
   /**
    * Status Pending.
    *
-   * Tasks are pending when they have not yet reached their start date.
+   * Tasks are pending before their start date or due to a pending module gate.
    */
   const STATUS_PENDING = 'pending';
 
@@ -26,7 +26,7 @@ interface TaskInterface extends FieldableEntityInterface {
   /**
    * Status Waiting.
    *
-   * Tasks are waiting when they have unresolved dependencies.
+   * Tasks wait when dependencies or the immediate service block their work.
    */
   const STATUS_WAITING = 'waiting';
 

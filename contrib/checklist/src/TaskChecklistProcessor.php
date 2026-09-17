@@ -2,10 +2,10 @@
 
 namespace Drupal\task_checklist;
 
-use Drupal\Core\Datetime\DrupalDateTime;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
+use Drupal\task\TaskReadiness;
 use Drupal\task\Entity\Task;
 use Drupal\task_checklist\Event\TaskChecklistEnvironmentDetectionEvent;
 use Drupal\task_checklist\Event\TaskChecklistEvents;
@@ -46,8 +46,18 @@ class TaskChecklistProcessor implements TaskChecklistProcessorInterface {
    *   The event dispatcher.
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_channel_factory
    *   The logger channel factory.
+   * @param \Drupal\task\TaskReadiness $readiness
+   *   The task readiness evaluator.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
    */
-  public function __construct(ModuleHandlerInterface $module_handler, EventDispatcherInterface $event_dispatcher, LoggerChannelFactoryInterface $logger_channel_factory) {
+  public function __construct(
+    ModuleHandlerInterface $module_handler,
+    EventDispatcherInterface $event_dispatcher,
+    LoggerChannelFactoryInterface $logger_channel_factory,
+    protected TaskReadiness $readiness,
+    protected EntityTypeManagerInterface $entityTypeManager,
+  ) {
     $this->moduleHandler = $module_handler;
     $this->eventDispatcher = $event_dispatcher;
     $this->logger = $logger_channel_factory->get('task_checklist');
@@ -57,10 +67,20 @@ class TaskChecklistProcessor implements TaskChecklistProcessorInterface {
    * {@inheritdoc}
    */
   public function processTask(Task $task) {
-    if (
-      in_array($task->status->value, [Task::STATUS_PENDING, Task::STATUS_ACTIVE]) &&
-      ($task->start->isEmpty() || $task->start->value < (new DrupalDateTime())->format(DateTimeItemInterface::DATETIME_STORAGE_FORMAT))
-    ) {
+    if ($task->isNew()) {
+      return;
+    }
+    // Retained task objects may predate a postponed start or resolution.
+    $task = $this->entityTypeManager->getStorage('task')->loadUnchanged($task->id());
+    if (!$task) {
+      return;
+    }
+    $readiness = $this->readiness->evaluate($task);
+    if ($readiness->state === 'invalid') {
+      $task->resolve(Task::RESOLUTION_INVALID)->save();
+      return;
+    }
+    if ($readiness->state === 'active') {
       if ($this->moduleHandler->moduleExists('exec_environment')) {
         $environment = new TaskChecklistEnvironmentDetectionEvent($task);
         $this->eventDispatcher->dispatch($environment, TaskChecklistEvents::DETECT_CHECKLIST_ENVIRONMENT);

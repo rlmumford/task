@@ -17,10 +17,11 @@ The supporting packages are `rlmumford/checklist`, `plugin_reference`,
 - Explicit assignees take precedence. Jobs can default to an active service
   manager, an active task creator, or no assignee. The `task.select_assignee`
   event remains the extension point for more sophisticated assignment rules.
-- Tasks with future start dates or unresolved dependencies are pending.
-  Drupal cron queues due tasks, and the `task_scheduled` worker rechecks them.
-  Resolving a prerequisite also rechecks its dependents. `waiting` is a manual
-  hold and is not automatically released. Queue scans rotate in batches of 100.
+- Stored `pending` means a future start or a pending module gate; `waiting`
+  means blocked work. Both are derived and automatically re-evaluated. Postpone
+  work by moving its start date. Cron queues due pending/waiting tasks, and the
+  worker rechecks them. Resolving a prerequisite also rechecks its dependents.
+  Queue scans rotate in batches of 100.
 - Notes on a task inherit its root and service references.
 - Interactive checklist routes and submissions require update access to the
   containing entity. Task permissions distinguish assigned and all tasks.
@@ -29,6 +30,64 @@ This is the initial reusable foundation, not a complete port of Drupal 7
 CounselKit. Its legal-specific checklist handlers, smart board, recurrence,
 assignment groups/condition expressions, resource-pane UX, and full audit
 semantics remain follow-up work. No existing CounselKit task data is migrated.
+
+## Task readiness
+
+`\Drupal::service('task.readiness')->evaluate($task)` returns a
+`TaskReadinessResult` with a `state` and all `reasons`. Supply the current task; referenced dependencies and the
+immediate service are reloaded from storage. The evaluator does not save entities.
+
+Precedence is resolved/closed, then a consumer invalidation, then pending
+(future start or draft immediate service), then waiting (unresolved/missing dependency, or non-active
+or missing immediate service), otherwise active. Due dates and deadlines do not
+block execution. Only `resolved` satisfies a dependency: **closed dependencies
+now block work**, unlike the earlier implementation. Ancestors never gate tasks.
+No service reference means no service gate.
+
+The stored non-terminal `status` is a projection of readiness: active → `active`,
+pending → `pending`, waiting → `waiting`. It is recomputed on save and can lag
+reference changes between saves. Runtime readiness is authoritative for processing.
+There is no manual waiting flag: setting `waiting` alone cannot hold a task;
+move `start` into the future instead. Completing a blocker cannot release work
+before that start date.
+
+Modules contribute gates by subscribing to `Drupal\task\Event\TaskReadinessEvent`.
+Subscribers are services tagged `event_subscriber`, with dependencies injected
+through their constructors. Register `TaskReadinessEvent::class` in
+`getSubscribedEvents()` and contribute from a typed handler:
+
+```php
+public function onReadiness(TaskReadinessEvent $event): void {
+  if (!$this->approval->isApproved($event->getTask())) {
+    $event->addReason('waiting', 'example_approval_required');
+  }
+}
+```
+
+`addReason($state, $code, $details)` accepts active, pending, waiting, or invalid,
+a non-empty reason code, and optional diagnostics. Add nothing or an active
+reason when ready. Contributions are additive and propagation cannot be stopped;
+subscriber order does not determine the final readiness state. Do not mutate the
+task or perform side effects from a subscriber. The evaluator owns precedence.
+
+Service's `ServiceTaskReadinessSubscriber` owns the immediate-service gate and
+is registered only when Task is enabled. Task has no service-specific gate logic.
+
+An `invalid` contribution recommends resolving the task with resolution `invalid`.
+Evaluation stays read-only; task saving and the checklist processor apply this
+recommendation and set the resolution timestamp. Repeated processing preserves
+terminal outcomes. Cancelled services default to `waiting`; consumer modules can
+recommend `invalid` for work no longer needed, while retaining cleanup tasks.
+
+The checklist processor reloads the task and requires active readiness before
+processing. Cron's worker also reloads the current task, preserving postponed
+starts and terminal states. Pending and waiting work is reconsidered as the
+schedule, dependencies, or contributing modules' gates change.
+
+Readiness is a point-in-time check, not an access check or an execution lock.
+The caller must enforce permissions and execution identity. Do not cache results
+or expose referenced IDs in reasons without checking access. Durable execution
+claims, per-item gates, and interactive action enforcement remain later work.
 
 ## Tests
 

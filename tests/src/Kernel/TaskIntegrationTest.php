@@ -29,7 +29,7 @@ class TaskIntegrationTest extends KernelTestBase {
     'task', 'task_context', 'task_checklist', 'task_job', 'checklist',
     'plugin_reference', 'typed_data', 'typed_data_reference',
     'typed_data_context_assignment', 'entity_template', 'typed_data_plus', 'entity_template_ui',
-    'inline_entity_form', 'views', 'service', 'note',
+    'inline_entity_form', 'views', 'service', 'note', 'task_readiness_test',
   ];
 
   /**
@@ -53,7 +53,12 @@ class TaskIntegrationTest extends KernelTestBase {
     $manager = User::create(['name' => 'manager', 'status' => 1]);
     $manager->save();
     ServiceType::create(['id' => 'recruitment', 'label' => 'Recruitment'])->save();
-    $service = Service::create(['type' => 'recruitment', 'label' => 'Recruitment support', 'manager' => $manager]);
+    $service = Service::create([
+      'type' => 'recruitment',
+      'label' => 'Recruitment support',
+      'status' => 'active',
+      'manager' => $manager,
+    ]);
     $service->save();
     $job = Job::create([
       'id' => 'review',
@@ -197,6 +202,70 @@ class TaskIntegrationTest extends KernelTestBase {
     $all = $fetcher->fetchFilteredData($task->getTypedData(), 'service.all', $metadata);
     $this->assertCount(2, $all->getValue());
     $this->assertContains('service_list', $metadata->getCacheTags());
+  }
+
+  /**
+   * Processing respects dependencies, service changes and a postponed start.
+   */
+  public function testChecklistReadinessGates(): void {
+    ServiceType::create(['id' => 'work', 'label' => 'Work'])->save();
+    $service = Service::create(['type' => 'work']);
+    $service->save();
+    $job = Job::create([
+      'id' => 'gated',
+      'label' => 'Gated work',
+      'default_checklist' => [
+        'review' => ['label' => 'Review', 'handler' => 'simply_checkable', 'handler_configuration' => []],
+      ],
+    ]);
+    $job->save();
+    $dependency = Task::create(['title' => 'Prerequisite']);
+    $dependency->save();
+    $task = Task::create(['title' => 'Work', 'job' => $job, 'service' => $service, 'dependencies' => [$dependency]]);
+    $task->save();
+    $task->checklist->checklist->getItem('review')->setComplete()->save();
+    $processor = $this->container->get('task_checklist.task_processor');
+    $processor->processTask($task);
+    $this->assertSame('pending', Task::load($task->id())->status->value);
+    $service->set('status', 'active')->save();
+    $task->save();
+    $processor->processTask($task);
+    $this->assertSame('waiting', Task::load($task->id())->status->value);
+
+    // Keep the service draft while the prerequisite resolves.
+    $service->set('status', 'draft')->save();
+    $dependency->resolve()->save();
+    $processor->processTask($task);
+    $this->assertSame('pending', Task::load($task->id())->status->value);
+    $service->set('status', 'complete')->save();
+    $processor->processTask($task);
+    $this->assertSame('pending', Task::load($task->id())->status->value);
+    $service->set('status', 'active')->save();
+    $held = Task::load($task->id());
+    $held->set('start', '2099-01-01T00:00:00')->save();
+    $processor->processTask($task);
+    $this->assertSame('pending', Task::load($task->id())->status->value);
+    $held->set('start', '2000-01-01T00:00:00')->save();
+    $this->assertSame('resolved', Task::load($task->id())->status->value);
+  }
+
+  /**
+   * Processing applies consumer invalidation once and preserves final outcomes.
+   */
+  public function testProcessorInvalidation(): void {
+    $task = Task::create(['title' => 'No longer needed']);
+    $task->save();
+    $this->container->get('state')->set('task_readiness_test.reasons', [
+      ['state' => 'invalid', 'code' => 'example_cancelled_work'],
+    ]);
+    $processor = $this->container->get('task_checklist.task_processor');
+    $processor->processTask($task);
+    $saved = Task::load($task->id());
+    $this->assertSame('resolved', $saved->status->value);
+    $this->assertSame('invalid', $saved->resolution->value);
+    $resolved = $saved->resolved->value;
+    $processor->processTask($task);
+    $this->assertSame($resolved, Task::load($task->id())->resolved->value);
   }
 
 }

@@ -1,22 +1,28 @@
 <?php
 
+/**
+ * @file
+ * Task scheduling and entity integrations.
+ */
+
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\exec_environment\EnvironmentAwareViewBuilder;
 
 /**
  * Implements hook_cron().
  */
 function task_cron() {
   // Queue due tasks so checklist processing does not hold up cron. The worker
-  // reloads the task: duplicate queue items cannot release a manual hold.
+  // reloads the task and recomputes scheduling and dependency/service gates.
   $storage = \Drupal::entityTypeManager()->getStorage('task');
   $state = \Drupal::state();
   $cursor = $state->get('task.scheduler_cursor', 0);
   $ids = $storage->getQuery()
     ->accessCheck(FALSE)
-    ->condition('status', 'pending')
+    ->condition('status', ['pending', 'waiting'], 'IN')
     ->condition('id', $cursor, '>')
     ->condition('start', gmdate('Y-m-d\TH:i:s', \Drupal::time()->getRequestTime()), '<=')
     ->sort('id')
@@ -32,13 +38,10 @@ function task_cron() {
 
 /**
  * Implements hook_entity_type_build().
- *
- * @param \Drupal\Core\Entity\EntityTypeInterface[] $entity_types
- *   The entity types to be built.
  */
 function task_entity_type_build(&$entity_types) {
   if (\Drupal::moduleHandler()->moduleExists('exec_environment')) {
-    $entity_types['task']->setViewBuilderClass(\Drupal\exec_environment\EnvironmentAwareViewBuilder::class);
+    $entity_types['task']->setViewBuilderClass(EnvironmentAwareViewBuilder::class);
   }
 }
 

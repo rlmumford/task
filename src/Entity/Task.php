@@ -243,18 +243,17 @@ class Task extends ContentEntityBase implements TaskInterface {
       $this->start->value = $now;
     }
 
-    // Pending is derived from the schedule and dependencies. Waiting is an
-    // explicit manual hold and must not be released by the scheduler.
-    if (in_array($this->status->value, [NULL, '', 'pending', 'active'], TRUE)) {
-      $open_dependencies = FALSE;
-      foreach ($this->dependencies as $item) {
-        if (!$item->entity || !in_array($item->entity->status->value, ['closed', 'resolved'], TRUE)) {
-          $open_dependencies = TRUE;
-          break;
-        }
+    // Non-terminal status is derived from scheduling and current gates.
+    // Postpone work by moving its start date, not by assigning a manual hold.
+    if (in_array($this->status->value, [NULL, '', 'pending', 'active', 'waiting'], TRUE)) {
+      // Runtime readiness also observes reference changes between task saves.
+      $readiness = \Drupal::service('task.readiness')->evaluate($this);
+      if ($readiness->state === 'invalid') {
+        $this->resolve(static::RESOLUTION_INVALID);
       }
-
-      $this->status->value = ($open_dependencies || $this->start->value > $now) ? 'pending' : 'active';
+      else {
+        $this->status->value = $readiness->state;
+      }
     }
 
     // @todo Lock tokens if this is resolved.

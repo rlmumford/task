@@ -1,0 +1,6 @@
+services:
+  task_readiness_test.subscriber:
+    class: Drupal\task_readiness_test\EventSubscriber\ReadinessSubscriber
+    arguments: ['@state']
+    tags:
+      - { name: event_subscriber }

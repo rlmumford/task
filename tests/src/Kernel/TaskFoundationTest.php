@@ -31,7 +31,7 @@ class TaskFoundationTest extends KernelTestBase {
   }
 
   /**
-   * Future work is released at its start time without releasing manual holds.
+   * Future work is released at its start time and can be postponed again.
    */
   public function testSchedule(): void {
     $task = Task::create(['title' => 'Scheduled', 'start' => gmdate('Y-m-d\TH:i:s', time() + 3600)]);
@@ -41,10 +41,10 @@ class TaskFoundationTest extends KernelTestBase {
     $task->start = '2000-01-01T12:00:00';
     $task->save();
     $this->assertSame('active', $task->status->value);
-    $task->status = 'waiting';
+    $task->start = gmdate('Y-m-d\TH:i:s', time() + 3600);
     $task->save();
     $this->container->get('plugin.manager.queue_worker')->createInstance('task_scheduled')->processItem($task->id());
-    $this->assertSame('waiting', Task::load($task->id())->status->value);
+    $this->assertSame('pending', Task::load($task->id())->status->value);
   }
 
   /**
@@ -55,8 +55,11 @@ class TaskFoundationTest extends KernelTestBase {
     $first->save();
     $next = Task::create(['title' => 'Next', 'dependencies' => [$first], 'root' => $first]);
     $next->save();
-    $this->assertSame('pending', $next->status->value);
+    $this->assertSame('waiting', $next->status->value);
+    $later = Task::create(['title' => 'Later', 'dependencies' => [$first], 'start' => '2099-01-01T00:00:00']);
+    $later->save();
     $first->resolve()->save();
+    $this->assertSame('pending', Task::load($later->id())->status->value);
     $this->container->get('entity_type.manager')->getStorage('task')->resetCache();
     $next = Task::load($next->id());
     $this->assertSame('active', $next->status->value);
