@@ -14,7 +14,7 @@ class EnvironmentJobTriggerIndexTest extends KernelTestBase {
    * {@inheritdoc}
    */
   public static $modules = [
-    'task', 'task_job', 'entity_template', 'exec_environment',
+    'task', 'task_job', 'entity_template', 'typed_data_plus', 'exec_environment',
     'exec_environment_config_test', 'user', 'options',
   ];
 

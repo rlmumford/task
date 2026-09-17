@@ -9,6 +9,6 @@
         "drupal/entity_template": "^1.0@alpha",
         "rlmumford/checklist": "2.x-dev",
         "php": ">=8.1",
-        "rlmumford/typed_data_plus": "2.x-dev"
+        "drupal/typed_data_plus": "2.0.x-dev"
     }
 }

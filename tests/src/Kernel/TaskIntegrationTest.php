@@ -24,7 +24,7 @@ class TaskIntegrationTest extends KernelTestBase {
     'system', 'user', 'field', 'text', 'filter', 'options', 'datetime', 'entity',
     'task', 'task_context', 'task_checklist', 'task_job', 'checklist',
     'plugin_reference', 'typed_data', 'typed_data_reference',
-    'typed_data_context_assignment', 'entity_template', 'entity_template_ui',
+    'typed_data_context_assignment', 'entity_template', 'typed_data_plus', 'entity_template_ui',
     'inline_entity_form', 'views', 'service', 'note',
   ];
 

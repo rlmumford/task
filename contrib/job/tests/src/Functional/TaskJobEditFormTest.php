@@ -21,7 +21,7 @@ class TaskJobEditFormTest extends BrowserTestBase {
    */
   protected static $modules = [
     'user', 'options', 'datetime', 'task', 'task_job', 'task_checklist',
-    'entity_template', 'views',
+    'entity_template', 'typed_data_plus', 'views',
   ];
 
   /**

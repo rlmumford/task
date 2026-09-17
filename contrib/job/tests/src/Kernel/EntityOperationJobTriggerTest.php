@@ -13,7 +13,7 @@ class EntityOperationJobTriggerTest extends EntityKernelTestBase {
    * {@inheritdoc}
    */
   public static $modules = [
-    'task', 'task_job', 'entity_template', 'entity_template_ui', 'entity',
+    'task', 'task_job', 'entity_template', 'typed_data_plus', 'entity_template_ui', 'entity',
     'typed_data', 'options', 'datetime',
   ];
 

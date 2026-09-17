@@ -14,7 +14,7 @@ class EnvironmentJobTriggerHandlerTest extends EntityKernelTestBase {
    * {@inheritdoc}
    */
   public static $modules = [
-    'task', 'task_job', 'entity_template', 'exec_environment', 'options',
+    'task', 'task_job', 'entity_template', 'typed_data_plus', 'exec_environment', 'options',
     'exec_environment_config_test', 'user', 'task_job_test', 'text', 'datetime',
   ];
 
