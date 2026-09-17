@@ -2,7 +2,6 @@
 
 namespace Drupal\task\Entity;
 
-use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -291,14 +290,22 @@ class Task extends ContentEntityBase implements TaskInterface {
    * @param string $resolution
    *   What sort of resolution this is.
    * @param \DateTimeInterface|null $time
-   *   The time it was resolved, if NULL then the current time will be used.
+   *   An explicit resolution time. Otherwise use the current time on the first
+   *   resolution, preserving the existing timestamp when already resolved.
    *
    * @return $this
    */
   public function resolve(string $resolution = Task::RESOLUTION_COMPLETE, ?\DateTimeInterface $time = NULL) {
+    if ($time !== NULL) {
+      $this->resolved = \DateTimeImmutable::createFromInterface($time)
+        ->setTimezone(new \DateTimeZone(DateTimeItemInterface::STORAGE_TIMEZONE))
+        ->format(DateTimeItemInterface::DATETIME_STORAGE_FORMAT);
+    }
+    elseif ($this->status->value !== static::STATUS_RESOLVED || $this->resolved->isEmpty()) {
+      $this->resolved = gmdate(DateTimeItemInterface::DATETIME_STORAGE_FORMAT, \Drupal::time()->getCurrentTime());
+    }
     $this->status = static::STATUS_RESOLVED;
     $this->resolution = $resolution;
-    $this->resolved = ($time ?? new DrupalDateTime())->format(DateTimeItemInterface::DATETIME_STORAGE_FORMAT);
 
     return $this;
   }

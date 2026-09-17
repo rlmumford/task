@@ -31,6 +31,19 @@ CounselKit. Its legal-specific checklist handlers, smart board, recurrence,
 assignment groups/condition expressions, resource-pane UX, and full audit
 semantics remain follow-up work. No existing CounselKit task data is migrated.
 
+## Resolution timestamps
+
+Saving a task with status `resolved` fills a missing `resolved` timestamp using
+current time, including direct field writes and status changes made by presave
+hooks. Repeated `resolve()` calls preserve its existing time unless an explicit
+replacement time is supplied. Explicit helper timestamps are converted to UTC
+without modifying the caller's date object.
+
+Reopening to a non-terminal status clears the current resolution timestamp;
+resolving again records the new time. Legacy `closed` retains a known resolution
+time but does not invent one, and remains distinct from `resolved` for dependencies.
+This uses the existing timestamp field; durable resolution history remains planned.
+
 ## Task readiness
 
 `\Drupal::service('task.readiness')->evaluate($task)` returns a

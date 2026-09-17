@@ -1,0 +1,17 @@
+<?php
+
+/**
+ * @file
+ * Exercises status changes made after the task's presave method.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+
+/**
+ * Implements hook_task_presave().
+ */
+function task_resolution_test_task_presave(EntityInterface $task) {
+  if ($status = \Drupal::state()->get('task_resolution_test.status')) {
+    $task->set('status', $status);
+  }
+}

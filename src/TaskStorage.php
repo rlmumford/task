@@ -5,6 +5,7 @@ namespace Drupal\task;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\Sql\SqlContentEntityStorage;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Drupal\task\Event\SelectAssigneeEvent;
 use Drupal\task\Event\TaskEvents;
 
@@ -42,6 +43,19 @@ class TaskStorage extends SqlContentEntityStorage {
    * {@inheritdoc}
    */
   protected function doSaveFieldItems(ContentEntityInterface $entity, array $names = []) {
+    // Normalize after all presave hooks, including direct status changes.
+    $previous_time = $entity->get('resolved')->value;
+    $status = $entity->get('status')->value;
+    if ($status === TaskInterface::STATUS_RESOLVED && $entity->get('resolved')->isEmpty()) {
+      $entity->set('resolved', gmdate(DateTimeItemInterface::DATETIME_STORAGE_FORMAT, \Drupal::time()->getCurrentTime()));
+    }
+    elseif (!in_array($status, [TaskInterface::STATUS_RESOLVED, TaskInterface::STATUS_CLOSED], TRUE)) {
+      $entity->set('resolved', NULL);
+    }
+    if ($names && $previous_time !== $entity->get('resolved')->value) {
+      $names[] = 'resolved';
+    }
+
     // Storage validators run inside the transaction, after all presave hooks.
     $this->moduleHandler()->invokeAll('task_storage_prewrite', [$entity]);
     parent::doSaveFieldItems($entity, $names);
