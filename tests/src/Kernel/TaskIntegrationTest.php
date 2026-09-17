@@ -4,6 +4,9 @@ namespace Drupal\Tests\task\Kernel;
 
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Core\Entity\EntityStorageException;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\note\Entity\Note;
 use Drupal\service\Entity\Service;
 use Drupal\service\Entity\ServiceType;
@@ -137,6 +140,63 @@ class TaskIntegrationTest extends KernelTestBase {
     $this->expectException(EntityStorageException::class);
     $this->expectExceptionMessage('missing');
     $task->save();
+  }
+
+  /**
+   * Changing only a task's reference invalidates its cached hierarchy result.
+   */
+  public function testTaskServiceCacheMetadata(): void {
+    ServiceType::create(['id' => 'work', 'label' => 'Work'])->save();
+    $first = Service::create(['type' => 'work', 'label' => 'First']);
+    $first->save();
+    $second = Service::create(['type' => 'work', 'label' => 'Second']);
+    $second->save();
+    $task = Task::create(['title' => 'Work', 'service' => $first]);
+    $task->save();
+    $property = $task->get('service')->first()->get('root');
+    $metadata = CacheableMetadata::createFromObject($property);
+    $this->assertContains('task:' . $task->id(), $metadata->getCacheTags());
+    $cache = $this->container->get('cache.render');
+    $cache->set('task_root', $first->id(), Cache::PERMANENT, $metadata->getCacheTags());
+    $this->assertNotFalse($cache->get('task_root'));
+    $task->set('service', $second)->save();
+    $this->assertFalse($cache->get('task_root'));
+    $this->assertSame($second->id(), $task->get('service')->first()->get('root')->getTargetIdentifier());
+  }
+
+  /**
+   * Fetcher metadata invalidates output when an intermediate service moves.
+   */
+  public function testFetchedHierarchyCacheInvalidation(): void {
+    ServiceType::create(['id' => 'work', 'label' => 'Work'])->save();
+    $first = Service::create(['type' => 'work', 'label' => 'First root']);
+    $first->save();
+    $second = Service::create(['type' => 'work', 'label' => 'Second root']);
+    $second->save();
+    $parent = Service::create(['type' => 'work', 'label' => 'Parent', 'service' => $first]);
+    $parent->save();
+    $task = Task::create(['title' => 'Work', 'service' => $parent]);
+    $task->save();
+    $fetcher = $this->container->get('typed_data_plus.data_fetcher');
+    $metadata = new BubbleableMetadata();
+    $value = $fetcher->fetchFilteredData($task->getTypedData(), 'service.root.label.value', $metadata);
+    $this->assertSame('First root', $value->getValue());
+    $this->assertContains('service_list', $metadata->getCacheTags());
+    $this->assertContains('task:' . $task->id(), $metadata->getCacheTags());
+    $cache = $this->container->get('cache.render');
+    $cache->set('fetched_root', $value->getValue(), Cache::PERMANENT, $metadata->getCacheTags());
+    $this->assertNotFalse($cache->get('fetched_root'));
+
+    // Neither the task nor the old root changes: only the hidden ancestor link.
+    $parent->set('service', $second)->save();
+    $this->assertFalse($cache->get('fetched_root'));
+    $value = $fetcher->fetchFilteredData($task->getTypedData(), 'service.root.label.value');
+    $this->assertSame('Second root', $value->getValue());
+
+    $metadata = new BubbleableMetadata();
+    $all = $fetcher->fetchFilteredData($task->getTypedData(), 'service.all', $metadata);
+    $this->assertCount(2, $all->getValue());
+    $this->assertContains('service_list', $metadata->getCacheTags());
   }
 
 }
