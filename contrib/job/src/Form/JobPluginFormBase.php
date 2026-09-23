@@ -11,7 +11,6 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\SubformState;
-use Drupal\Core\Plugin\ContextAwarePluginInterface;
 use Drupal\Core\Plugin\PluginFormFactoryInterface;
 use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -62,7 +61,7 @@ abstract class JobPluginFormBase extends FormBase {
     TaskJobTempstoreRepository $tempstore_repository,
     PluginFormFactoryInterface $plugin_form_factory,
     PluginManagerInterface $manager,
-    ConfigFactoryInterface $config_factory
+    ConfigFactoryInterface $config_factory,
   ) {
     $this->tempstoreRepository = $tempstore_repository;
     $this->pluginFormFactory = $plugin_form_factory;
@@ -78,7 +77,7 @@ abstract class JobPluginFormBase extends FormBase {
     FormStateInterface $form_state,
     ?JobInterface $task_job = NULL,
     $plugin_id = NULL,
-    $plugin_configuration = []
+    $plugin_configuration = [],
   ) {
     // Get the Job from tempstore if available.
     $job = $task_job;
@@ -94,10 +93,9 @@ abstract class JobPluginFormBase extends FormBase {
 
     /** @var \Drupal\Core\Plugin\PluginWithFormsInterface $plugin */
     $plugin = $this->manager->createInstance($plugin_id, $plugin_configuration);
+    $form_state->set('configured_plugin', $plugin);
 
-    if ($plugin instanceof ContextAwarePluginInterface) {
-      $form_state->setTemporaryValue('gathered_contexts', $this->gatherContexts($task_job));
-    }
+    $form_state->setTemporaryValue('gathered_contexts', $this->gatherContexts($job));
 
     if (
       $plugin instanceof PluginWithFormsInterface &&
@@ -155,10 +153,12 @@ abstract class JobPluginFormBase extends FormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
-    $plugin_id = $form_state->getValue('plugin_id');
+    if (($form_state->getTriggeringElement()['#limit_validation_errors'] ?? NULL) === []) {
+      return;
+    }
 
     /** @var \Drupal\Core\Plugin\PluginWithFormsInterface $plugin */
-    $plugin = $this->manager->createInstance($plugin_id);
+    $plugin = $form_state->get('configured_plugin');
     if (
       $plugin instanceof PluginWithFormsInterface &&
       $plugin->hasFormClass('configure')
@@ -184,10 +184,8 @@ abstract class JobPluginFormBase extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $handler = $form_state->getValue('plugin_id');
-
     /** @var \Drupal\Core\Plugin\PluginWithFormsInterface $plugin */
-    $plugin = $this->manager->createInstance($handler);
+    $plugin = $form_state->get('configured_plugin');
     if (
       $plugin instanceof PluginWithFormsInterface &&
       $plugin->hasFormClass('configure')
@@ -223,7 +221,7 @@ abstract class JobPluginFormBase extends FormBase {
    */
   protected function successfulAjaxSubmit(
     array $form,
-    FormStateInterface $form_state
+    FormStateInterface $form_state,
   ) {
     $response = new AjaxResponse();
     $response->addCommand(new RedirectCommand(Url::fromRoute(

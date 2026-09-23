@@ -3,9 +3,9 @@
 namespace Drupal\task_job\Form;
 
 use Drupal\checklist\ChecklistContextCollectorInterface;
+use Drupal\checklist\Form\ConditionConfigurationForm;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Plugin\Context\EntityContext;
-use Drupal\Core\Plugin\Context\EntityContextDefinition;
+use Drupal\Core\Form\SubformState;
 use Drupal\task_job\JobConfigurationChecklist;
 use Drupal\task_job\JobInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -23,15 +23,22 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
   protected ChecklistContextCollectorInterface $contextCollector;
 
   /**
+   * Embeds condition plugins with configuration-time contexts.
+   */
+  protected ConditionConfigurationForm $conditions;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
-    return (new static(
+    $instance = (new static(
       $container->get('task_job.tempstore_repository'),
       $container->get('plugin_form.factory'),
       $container->get('plugin.manager.checklist_item_handler'),
       $container->get('config.factory')
     ))->setChecklistContextCollector($container->get('checklist.context_collector'));
+    $instance->conditions = $container->get('checklist.condition_configuration_form');
+    return $instance;
   }
 
   /**
@@ -62,7 +69,7 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
     FormStateInterface $form_state,
     ?JobInterface $task_job = NULL,
     $handler = NULL,
-    $handler_config = []
+    $handler_config = [],
   ) {
     $form = parent::buildForm(
       $form,
@@ -96,24 +103,50 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
       '#weight' => -8,
     ];
 
-    $form['placeholders'] = [
-      '#type' => 'available_placeholders',
-      '#title' => $this->t('Placeholders and Filters'),
-      '#contexts' => [
-        'checklist_item' => new EntityContext(
-          EntityContextDefinition::fromEntityTypeId('checklist_item', 'This Checklist Item')
-            ->addConstraint('Bundle', 'job')
-        ),
-        'task' => new EntityContext(
-          EntityContextDefinition::fromEntityTypeId('task', 'The Task'),
-          \Drupal::entityTypeManager()->getStorage('task')->create([
-            'job' => $task_job,
-          ])
-        ),
-      ],
-    ];
+    $contexts = $form_state->getTemporaryValue('gathered_contexts') ?? [];
+    $configuration = $form_state->get('configured_plugin')->getConfiguration();
+    $form['conditions'] = ['#type' => 'details', '#title' => $this->t('Conditions'), '#tree' => TRUE];
+    foreach ([
+      'applicability' => $this->t('Applicable'),
+      'actionability' => $this->t('Actionable'),
+      'required' => $this->t('Required'),
+    ] as $gate => $label) {
+      $element = ['#type' => 'details', '#title' => $label, '#parents' => ['conditions', $gate]];
+      $state = SubformState::createForSubform($element, $form, $form_state);
+      $form['conditions'][$gate] = $this->conditions->build($element, $state, $configuration['conditions'][$gate] ?? [], $contexts);
+    }
+    $form['contexts'] = ['#type' => 'details', '#title' => $this->t('Available contexts')];
+    foreach ($contexts as $name => $context) {
+      $form['contexts'][$name] = [
+        '#type' => 'item',
+        '#title' => $name,
+        '#plain_text' => (string) $context->getContextDefinition()->getLabel(),
+      ];
+    }
 
     return $form;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    parent::validateForm($form, $form_state);
+    if (($form_state->getTriggeringElement()['#limit_validation_errors'] ?? NULL) === []) {
+      return;
+    }
+    $name = $form_state->getValue('name');
+    if (!preg_match('/^[a-z][a-z0-9_]*$/D', $name) || (empty($form['name']['#disabled']) && isset($form_state->get('job')->getChecklistItems()[$name]))) {
+      $form_state->setError($form['name'], $this->t('Use a unique machine name starting with a lowercase letter, followed by lowercase letters, digits or underscores.'));
+    }
+    $gates = [];
+    foreach (['applicability', 'actionability', 'required'] as $gate) {
+      $element = &$form['conditions'][$gate];
+      if ($condition = $this->conditions->configuration($element, SubformState::createForSubform($element, $form, $form_state))) {
+        $gates[$gate] = $condition;
+      }
+    }
+    $form_state->set('checklist_conditions', $gates);
   }
 
   /**
@@ -124,6 +157,9 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
 
     /** @var \Drupal\Component\Plugin\PluginInspectionInterface $plugin */
     $plugin = $form_state->get('plugin');
+    $configuration = $plugin->getConfiguration();
+    $configuration['conditions'] = $form_state->get('checklist_conditions');
+    $plugin->setConfiguration($configuration);
     $job = $form_state->get('job');
     $checklist_items = $job->get('default_checklist');
     $checklist_items[$form_state->getValue('name')] = [

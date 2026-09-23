@@ -3,6 +3,7 @@
 namespace Drupal\task_job\Entity;
 
 use Drupal\Component\Plugin\LazyPluginCollection;
+use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
@@ -262,6 +263,25 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
       'triggers' => $this->getTriggerCollection(),
       'resources' => $this->getResourcesCollection(),
     ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    parent::calculateDependencies();
+    $manager = \Drupal::service('plugin.manager.checklist_item_handler');
+    foreach ($this->getChecklistItems() as $item) {
+      $handler = $manager->createInstance($item['handler'], $item['handler_configuration']);
+      $dependencies = $handler instanceof DependentPluginInterface ? $handler->calculateDependencies() : [];
+      $dependencies['module'][] = $handler->getPluginDefinition()['provider'];
+      foreach ($dependencies as $type => $names) {
+        foreach ($names as $name) {
+          $this->addDependency($type, $name);
+        }
+      }
+    }
+    return $this;
   }
 
 }

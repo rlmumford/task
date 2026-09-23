@@ -7,6 +7,8 @@ use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\note\Entity\Note;
 use Drupal\service\Entity\Service;
 use Drupal\service\Entity\ServiceType;
@@ -87,6 +89,62 @@ class TaskIntegrationTest extends KernelTestBase {
     $checklist->getItem('review')->setComplete()->save();
     $checklist->complete();
     $this->assertSame('resolved', $task->status->value);
+  }
+
+  /**
+   * A shared task checklist follows the default host revision and fresh inputs.
+   */
+  public function testSharedChecklistExecutionBinding(): void {
+    $account = User::create(['name' => 'administrator', 'status' => 1]);
+    $account->save();
+    $this->container->get('current_user')->setAccount($account);
+    $job = Job::create([
+      'id' => 'shared',
+      'label' => 'Shared checklist',
+      'default_checklist' => [
+        'review' => ['label' => 'Review', 'handler' => 'simply_checkable', 'handler_configuration' => []],
+      ],
+    ]);
+    $job->save();
+    $task = Task::create(['title' => 'Original', 'job' => $job]);
+    $task->save();
+    $this->assertTrue($task->getEntityType()->isRevisionable());
+    $this->assertFalse($task->getFieldDefinition('checklist')->getFieldStorageDefinition()->isRevisionable());
+    $item = $task->checklist->checklist->getItem('review');
+    $item->save();
+    $preparer = $this->container->get('checklist.item_execution_preparer');
+    [, $before] = $preparer->prepare($item->uuid(), FALSE);
+    $task->setNewRevision(TRUE);
+    $task->set('title', 'Updated')->save();
+    [$checklist, $current] = $preparer->load($item->uuid(), FALSE);
+    $this->assertSame($item->uuid(), $current->uuid());
+    $this->assertEquals($task->getRevisionId(), $checklist->getEntity()->getRevisionId());
+    $this->assertSame('Updated', $checklist->getEntity()->label());
+    [, $after] = $preparer->prepare($item->uuid(), FALSE);
+    $this->assertNotSame($before, $after);
+
+    // Configurable fields are revisionable and cannot use this shared binding.
+    FieldStorageConfig::create([
+      'field_name' => 'revision_work',
+      'entity_type' => 'task',
+      'type' => 'checklist',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'revision_work',
+      'entity_type' => 'task',
+      'bundle' => 'task',
+      'translatable' => FALSE,
+    ])->save();
+    $other = Task::create([
+      'title' => 'Revision-specific work',
+      'revision_work' => ['id' => 'job', 'configuration' => ['job' => $job->id()]],
+    ]);
+    $other->save();
+    $revision_item = $other->revision_work->checklist->getItem('review');
+    $revision_item->save();
+    $this->expectException(\DomainException::class);
+    $this->expectExceptionMessage('Revisioned, multivalue and translated checklist bindings need a workspace adapter.');
+    $preparer->load($revision_item->uuid(), FALSE);
   }
 
   /**
