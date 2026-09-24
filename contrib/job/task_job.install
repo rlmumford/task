@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * @file
+ * Install and update hooks for the task job module.
+ */
+
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
@@ -82,6 +87,18 @@ function task_job_install() {
 
   $storage_definition_listener->onFieldStorageDefinitionCreate($definition);
   $definition_listener->onFieldDefinitionCreate($definition);
+
+  $version_definition = BaseFieldDefinition::create('string')
+    ->setName('job_version')
+    ->setProvider('task_job')
+    ->setTargetEntityTypeId('task')
+    ->setLabel(new TranslatableMarkup('Job version'))
+    ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
+    ->setSetting('max_length', 128)
+    ->setDisplayConfigurable('view', TRUE)
+    ->setDisplayConfigurable('form', TRUE);
+  $storage_definition_listener->onFieldStorageDefinitionCreate($version_definition);
+  $definition_listener->onFieldDefinitionCreate($version_definition);
 }
 
 /**
@@ -105,6 +122,18 @@ function task_job_uninstall() {
 
   $storage_definition_listener->onFieldStorageDefinitionDelete($definition);
   $definition_listener->onFieldDefinitionDelete($definition);
+
+  $version_definition = BaseFieldDefinition::create('string')
+    ->setName('job_version')
+    ->setProvider('task_job')
+    ->setTargetEntityTypeId('task')
+    ->setLabel(new TranslatableMarkup('Job version'))
+    ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
+    ->setSetting('max_length', 128)
+    ->setDisplayConfigurable('view', TRUE)
+    ->setDisplayConfigurable('form', TRUE);
+  $storage_definition_listener->onFieldStorageDefinitionDelete($version_definition);
+  $definition_listener->onFieldDefinitionDelete($version_definition);
 }
 
 /**
@@ -203,7 +232,7 @@ function task_job_update_8003() {
     ['collection'],
     [
       'fields' => [
-        'collection' =>  [
+        'collection' => [
           'description' => 'The config collection of the job.',
           'type' => 'varchar',
           'length' => 255,
@@ -224,4 +253,23 @@ function task_job_update_8004() {
     'task_job_trigger_index',
     ['job', 'trigger_key', 'collection']
   );
+}
+
+/**
+ * Add the named job version to tasks.
+ */
+function task_job_update_8005() {
+  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
+  $definition_listener = \Drupal::service('field_definition.listener');
+  $definition = BaseFieldDefinition::create('string')
+    ->setName('job_version')
+    ->setProvider('task_job')
+    ->setTargetEntityTypeId('task')
+    ->setLabel(new TranslatableMarkup('Job version'))
+    ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
+    ->setSetting('max_length', 128)
+    ->setDisplayConfigurable('view', TRUE)
+    ->setDisplayConfigurable('form', TRUE);
+  $storage_definition_listener->onFieldStorageDefinitionCreate($definition);
+  $definition_listener->onFieldDefinitionCreate($definition);
 }

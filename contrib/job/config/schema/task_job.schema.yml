@@ -59,6 +59,27 @@ task_job.task_job.*:
             handler_configuration:
               type: checklist_item_handler.[%parent.handler]
               label: 'The handler configuration.'
+    version:
+      type: string
+      label: 'Named job version'
+    version_of:
+      type: string
+      label: 'Logical job ID'
+    dirty:
+      type: boolean
+      label: 'Working copy'
+    code_revision:
+      type: integer
+      label: 'Revision supplied by code'
+    system_revision:
+      type: integer
+      label: 'Revision in the active system'
+    last_imported_hash:
+      type: string
+      label: 'Hash of the last imported definition'
+    active_hash:
+      type: string
+      label: 'Hash of the active definition'
     triggers:
       type: sequence
       label: 'Triggers'
@@ -89,7 +110,5 @@ task_job.trigger.*:
 task_job.trigger.manual:
   type: task_job.trigger
   label: 'Manual Trigger Handler Settings'
-
-
 
 

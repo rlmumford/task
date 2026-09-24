@@ -13,6 +13,52 @@ use Drupal\typed_data\Context\ContextDefinition;
 interface JobInterface extends ConfigEntityInterface {
 
   /**
+   * Get the version identifier for this job, if it is versioned.
+   *
+   * @return string|null
+   *   The version identifier.
+   */
+  public function getVersion(): ?string;
+
+  /**
+   * Get the logical ID shared by all versions of this job.
+   *
+   * @return string
+   *   The unversioned job ID.
+   */
+  public function getBaseJobId(): string;
+
+  /**
+   * Determine whether this job is a named version.
+   */
+  public function isVersioned(): bool;
+
+  /**
+   * Determine whether this job is a dirty working copy.
+   */
+  public function isDirty(): bool;
+
+  /**
+   * Get the code revision recorded on this job definition.
+   */
+  public function getCodeRevision(): ?int;
+
+  /**
+   * Get the active system revision recorded on this job definition.
+   */
+  public function getSystemRevision(): ?int;
+
+  /**
+   * Get the last imported definition hash.
+   */
+  public function getLastImportedHash(): ?string;
+
+  /**
+   * Get the active definition hash.
+   */
+  public function getActiveHash(): string;
+
+  /**
    * Get the default checklist items for this job.
    *
    * @return array

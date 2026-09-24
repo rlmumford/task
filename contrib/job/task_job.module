@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * @file
+ * Task job integration for task entities and checklists.
+ */
+
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
@@ -20,6 +25,12 @@ function task_job_entity_base_field_info(EntityTypeInterface $entity_type) {
       ->setSetting('target_type', 'task_job')
       ->setDisplayConfigurable('view', TRUE)
       ->setDisplayConfigurable('form', TRUE);
+    $fields['job_version'] = BaseFieldDefinition::create('string')
+      ->setLabel(new TranslatableMarkup('Job version'))
+      ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
+      ->setSetting('max_length', 128)
+      ->setDisplayConfigurable('view', TRUE)
+      ->setDisplayConfigurable('form', TRUE);
   }
 
   return $fields;
@@ -38,15 +49,20 @@ function task_job_entity_base_field_info_alter(&$fields, EntityTypeInterface $en
  * Default value callback to set the checklist value when a task job is set.
  *
  * @param \Drupal\task\Entity\Task $task
- *   The task
+ *   The task.
  */
 function _task_job_task_checklist_default_value(EntityInterface $task) {
   if (!$task->job->isEmpty()) {
+    $configuration = [
+      'job' => $task->job->target_id,
+    ];
+    if (!$task->get('job_version')->isEmpty()) {
+      $configuration['job_version'] = $task->get('job_version')->value;
+    }
+
     return [
       'id' => 'job',
-      'configuration' => [
-        'job' => $task->job->target_id,
-      ]
+      'configuration' => $configuration,
     ];
   }
 
@@ -114,7 +130,7 @@ function _task_job_trigger_entity_operation(string $op, EntityInterface $entity)
       $plugin_id,
       array_filter([
         $entity->getEntityTypeId() => $entity,
-        "original_{$entity->getEntityTypeId()}" => isset($entity->original) ? $entity->original : NULL,
+        "original_{$entity->getEntityTypeId()}" => $entity->original ?? NULL,
       ])
     );
   }
@@ -165,7 +181,7 @@ function task_job_task_prepare_form(EntityInterface $task, string $op, FormState
 }
 
 /**
- * Implement hook_plugin_filter_PLUGIN_TYPE__CONSUMER() for block and task_job_resource.
+ * Implements hook_plugin_filter_block__task_job_resource_alter().
  *
  * Some block plugins make no sense as resources. Remove them.
  */

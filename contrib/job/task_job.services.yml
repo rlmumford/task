@@ -1,4 +1,12 @@
 services:
+  task_job.config_version_subscriber:
+    class: Drupal\task_job\EventSubscriber\JobConfigVersionSubscriber
+    arguments: ['@config.storage']
+    tags:
+      - { name: event_subscriber }
+  task_job.version_resolver:
+    class: Drupal\task_job\JobVersionResolver
+    arguments: ['@entity_type.manager']
   task_job.assignment_subscriber:
     class: Drupal\task_job\EventSubscriber\AssignmentSubscriber
     tags:

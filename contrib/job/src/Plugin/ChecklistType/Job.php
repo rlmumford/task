@@ -9,6 +9,7 @@ use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\Plugin\PluginWithFormsTrait;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\JobInterface;
+use Drupal\task_job\JobVersionResolverInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -32,9 +33,9 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
   /**
    * The job storage.
    *
-   * @var \Drupal\Core\Entity\EntityStorageInterface
+   * @var \Drupal\task_job\JobVersionResolverInterface
    */
-  protected $jobStorage;
+  protected $jobVersionResolver;
 
   /**
    * {@inheritdoc}
@@ -46,7 +47,7 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
       $plugin_definition,
       $container->get('entity_type.manager')->getStorage('checklist_item'),
       $container->get('event_dispatcher'),
-      $container->get('entity_type.manager')->getStorage('task_job')
+      $container->get('task_job.version_resolver')
     );
   }
 
@@ -63,8 +64,8 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
    *   The checklist item entity storage.
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
    *   The event dispatcher service.
-   * @param \Drupal\Core\Entity\EntityStorageInterface $job_storage
-   *   The job storage.
+   * @param \Drupal\task_job\JobVersionResolverInterface $job_version_resolver
+   *   The job version resolver.
    */
   public function __construct(
     array $configuration,
@@ -72,11 +73,11 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
     $plugin_definition,
     EntityStorageInterface $item_storage,
     EventDispatcherInterface $event_dispatcher,
-    EntityStorageInterface $job_storage
+    JobVersionResolverInterface $job_version_resolver,
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $item_storage, $event_dispatcher);
 
-    $this->jobStorage = $job_storage;
+    $this->jobVersionResolver = $job_version_resolver;
   }
 
   /**
@@ -89,9 +90,14 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
    *   The job.
    */
   public function getJob() : ?JobInterface {
-    return $this->configuration['job'] instanceof JobInterface ?
-      $this->configuration['job'] :
-      ($this->jobStorage->load($this->configuration['job']) ?? NULL);
+    if ($this->configuration['job'] instanceof JobInterface) {
+      return $this->configuration['job'];
+    }
+
+    return $this->jobVersionResolver->load(
+      $this->configuration['job'],
+      $this->configuration['job_version'] ?? NULL
+    );
   }
 
   /**

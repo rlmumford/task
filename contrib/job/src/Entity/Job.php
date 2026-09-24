@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\Core\Plugin\DefaultLazyPluginCollection;
 use Drupal\task_job\JobInterface;
+use Drupal\task_job\JobVersionId;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerInterface;
 use Drupal\task_job\Plugin\JobTrigger\LazyJobTriggerCollection;
 use Drupal\typed_data\Context\ContextDefinition;
@@ -35,6 +36,13 @@ use Drupal\typed_data\Context\ContextDefinition;
  *     "default_checklist",
  *     "triggers",
  *     "assignment",
+ *     "version",
+ *     "version_of",
+ *     "dirty",
+ *     "code_revision",
+ *     "system_revision",
+ *     "last_imported_hash",
+ *     "active_hash",
  *   },
  *   handlers = {
  *     "list_builder" = "Drupal\task_job\Controller\JobListBuilder",
@@ -65,6 +73,140 @@ use Drupal\typed_data\Context\ContextDefinition;
  * @package Drupal\task_job\Entity
  */
 class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginCollectionInterface {
+
+  /**
+   * The named version of this job.
+   *
+   * @var string|null
+   */
+  protected $version;
+
+  /**
+   * The logical job ID this version belongs to.
+   *
+   * @var string|null
+   */
+  protected $version_of;
+
+  /**
+   * Whether this is a UI working copy rather than a clean version.
+   *
+   * @var bool
+   */
+  protected $dirty = FALSE;
+
+  /**
+   * The code revision.
+   *
+   * @var int|null
+   */
+  protected $code_revision;
+
+  /**
+   * The active system revision.
+   *
+   * @var int|null
+   */
+  protected $system_revision;
+
+  /**
+   * The last imported definition hash.
+   *
+   * @var string|null
+   */
+  protected $last_imported_hash;
+
+  /**
+   * The active definition hash.
+   *
+   * @var string|null
+   */
+  protected $active_hash;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getVersion(): ?string {
+    return $this->version ?: JobVersionId::version($this->id());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getBaseJobId(): string {
+    return $this->version_of ?: JobVersionId::base($this->id());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isVersioned(): bool {
+    return $this->getVersion() !== NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isDirty(): bool {
+    return (bool) $this->dirty || JobVersionId::isDirty($this->id());
+  }
+
+  /**
+   * Return a stable hash for the definition, excluding revision bookkeeping.
+   *
+   * @param array $values
+   *   Exported job values.
+   *
+   * @return string
+   *   A SHA-256 definition hash.
+   */
+  public static function definitionHash(array $values): string {
+    foreach (['code_revision', 'system_revision', 'last_imported_hash', 'active_hash'] as $key) {
+      unset($values[$key]);
+    }
+
+    return hash('sha256', serialize($values));
+  }
+
+  /**
+   * Get the code revision recorded on this definition.
+   */
+  public function getCodeRevision(): ?int {
+    return $this->code_revision === NULL ? NULL : (int) $this->code_revision;
+  }
+
+  /**
+   * Get the active system revision recorded on this definition.
+   */
+  public function getSystemRevision(): ?int {
+    return $this->system_revision === NULL ? NULL : (int) $this->system_revision;
+  }
+
+  /**
+   * Get the hash of the last imported code definition.
+   */
+  public function getLastImportedHash(): ?string {
+    return $this->last_imported_hash ?: NULL;
+  }
+
+  /**
+   * Get the hash of the active definition.
+   */
+  public function getActiveHash(): string {
+    return $this->active_hash ?: static::definitionHash($this->toArray());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function preSave(EntityStorageInterface $storage) {
+    if ($this->isDirty()) {
+      $this->system_revision = ((int) $this->system_revision) + 1;
+    }
+
+    $this->active_hash = static::definitionHash($this->toArray());
+    parent::preSave($storage);
+  }
 
   /**
    * The default assignment rule; explicit task assignees take precedence.
