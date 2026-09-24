@@ -47,6 +47,13 @@ class JobListBuilder extends EntityListBuilder {
    */
   protected function getDefaultOperations(EntityInterface $entity) {
     $operations = parent::getDefaultOperations($entity);
+    if ($entity instanceof JobInterface && !$entity->isVersioned()) {
+      $operations['versions'] = [
+        'title' => $this->t('Versions'),
+        'weight' => 13,
+        'url' => $this->ensureDestination($entity->toUrl('versions')),
+      ];
+    }
     foreach (['enable', 'disable'] as $op) {
       if ($entity->access($op) && $entity->hasLinkTemplate("{$op}-form")) {
         $operations[$op] = [

@@ -5,6 +5,13 @@ task_job.resource.choose_block:
     _title: 'Choose a Resource'
   requirements:
     _entity_access: 'task_job.update'
+entity.task_job.versions:
+  path: '/admin/config/task/job/{task_job}/versions'
+  defaults:
+    _controller: '\Drupal\task_job\Controller\JobVersionListController::versions'
+    _title: 'Job versions'
+  requirements:
+    _entity_access: 'task_job.update'
 task_job.resource.add:
   path: '/admin/config/task/job/{task_job}/resource/add/{plugin_id}'
   defaults:
@@ -96,4 +103,3 @@ task_job.task_board.task.add_form:
     _title: 'Add Task'
   requirements:
     _entity_create_access: 'task'
-

@@ -63,6 +63,7 @@ use Drupal\typed_data\Context\ContextDefinition;
  *     "collection" = "/admin/config/task/job",
  *     "add-form" = "/admin/config/task/job/add",
  *     "canonical" = "/admin/config/task/job/{task_job}",
+ *     "versions" = "/admin/config/task/job/{task_job}/versions",
  *     "edit-form" = "/admin/config/task/job/{task_job}/edit",
  *     "disable-form" = "/admin/config/task/job/{task_job}/disable",
  *     "enable-form" = "/admin/config/task/job/{task_job}/enable",
