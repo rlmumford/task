@@ -12,6 +12,7 @@ use Drupal\entity_template\TemplateBuilderManager;
 use Drupal\task_job\Event\SelectJobEnvironmentDetectionEvent;
 use Drupal\task_job\Event\TaskJobEvents;
 use Drupal\task_job\JobInterface;
+use Drupal\task_job\JobVersionResolverInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -36,6 +37,13 @@ class TaskAddController extends ControllerBase {
   protected $eventDispatcher;
 
   /**
+   * The job version resolver.
+   *
+   * @var \Drupal\task_job\JobVersionResolverInterface
+   */
+  protected $jobVersionResolver;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
@@ -44,7 +52,8 @@ class TaskAddController extends ControllerBase {
       $container->get('entity.form_builder'),
       $container->get('plugin.manager.entity_template.builder'),
       $container->get('event_dispatcher'),
-      $container->get('current_user')
+      $container->get('current_user'),
+      $container->get('task_job.version_resolver')
     );
   }
 
@@ -61,19 +70,23 @@ class TaskAddController extends ControllerBase {
    *   The event dispatcher service.
    * @param \Drupal\Core\Session\AccountInterface $current_user
    *   The current user.
+   * @param \Drupal\task_job\JobVersionResolverInterface $job_version_resolver
+   *   The job version resolver.
    */
   public function __construct(
     EntityTypeManagerInterface $entity_type_manager,
     EntityFormBuilderInterface $entity_form_builder,
     TemplateBuilderManager $template_builder_manager,
     EventDispatcherInterface $event_dispatcher,
-    AccountInterface $current_user
+    AccountInterface $current_user,
+    JobVersionResolverInterface $job_version_resolver,
   ) {
     $this->entityTypeManager = $entity_type_manager;
     $this->entityFormBuilder = $entity_form_builder;
     $this->builderManager = $template_builder_manager;
     $this->eventDispatcher = $event_dispatcher;
     $this->currentUser = $current_user;
+    $this->jobVersionResolver = $job_version_resolver;
   }
 
   /**
@@ -108,6 +121,11 @@ class TaskAddController extends ControllerBase {
     $job_storage = $this->entityTypeManager->getStorage('task_job');
     /** @var \Drupal\task_job\JobInterface $job */
     foreach ($job_storage->loadMultiple() as $job) {
+      if ($job->isVersioned()) {
+        continue;
+      }
+
+      $job = $this->jobVersionResolver->loadLatest($job->id()) ?: $job;
       $cache->addCacheableDependency($job);
       if ($job->status() && $job->hasTrigger('manual')) {
         $route_name = 'task_job.task.add_form';
@@ -190,7 +208,16 @@ class TaskAddController extends ControllerBase {
    *   The build form.
    */
   public function createTask(JobInterface $task_job, ?AccountInterface $assignee = NULL) {
-    $task = $task_job->getTrigger('manual')->createTask();
+    $effective_job = $task_job->isVersioned()
+      ? $task_job
+      : ($this->jobVersionResolver->loadLatest($task_job->id()) ?: $task_job);
+    $task = $effective_job->getTrigger('manual')->createTask();
+    if ($task) {
+      $task->set('job', $effective_job->getBaseJobId());
+      if ($effective_job->getVersion() !== NULL) {
+        $task->set('job_version', $effective_job->getVersion());
+      }
+    }
     if ($task && $assignee) {
       $task->assignee = $assignee->id();
     }
