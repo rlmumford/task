@@ -120,7 +120,12 @@ class TaskReadinessTest extends KernelTestBase {
       $parent->set('status', $status)->save();
       $this->assertSame('active', $evaluator->evaluate($task)->state);
       $child->set('status', $status)->save();
-      $this->assertSame($status === 'draft' ? 'pending' : 'waiting', $evaluator->evaluate($task)->state);
+      $expected = match ($status) {
+        'draft' => 'pending',
+        'cancelled', 'superseded' => 'invalid',
+        default => 'waiting',
+      };
+      $this->assertSame($expected, $evaluator->evaluate($task)->state);
       $child->set('status', 'active')->save();
     }
     $task->set('service', 999999);
@@ -166,6 +171,21 @@ class TaskReadinessTest extends KernelTestBase {
     $this->assertEquals($task->id(), $item->data);
     $this->container->get('plugin.manager.queue_worker')->createInstance('task_scheduled')->processItem($item->data);
     $this->assertSame('active', Task::load($task->id())->status->value);
+  }
+
+  /**
+   * Cancelled and superseded services invalidate their immediate task work.
+   */
+  public function testTerminalServiceInvalidatesTask(): void {
+    foreach (['cancelled', 'superseded'] as $status) {
+      $service = Service::create(['type' => 'work', 'status' => $status]);
+      $service->save();
+      $task = Task::create(['title' => ucfirst($status), 'service' => $service]);
+
+      $result = $this->container->get('task.readiness')->evaluate($task);
+      $this->assertSame('invalid', $result->state);
+      $this->assertSame('service_' . $status, $result->reasons[0]['code']);
+    }
   }
 
   /**
