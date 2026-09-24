@@ -95,6 +95,7 @@ function task_job_install() {
     ->setLabel(new TranslatableMarkup('Job version'))
     ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
     ->setSetting('max_length', 128)
+    ->setInternal(TRUE)
     ->setDisplayConfigurable('view', TRUE)
     ->setDisplayConfigurable('form', TRUE);
   $storage_definition_listener->onFieldStorageDefinitionCreate($version_definition);
@@ -130,6 +131,7 @@ function task_job_uninstall() {
     ->setLabel(new TranslatableMarkup('Job version'))
     ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
     ->setSetting('max_length', 128)
+    ->setInternal(TRUE)
     ->setDisplayConfigurable('view', TRUE)
     ->setDisplayConfigurable('form', TRUE);
   $storage_definition_listener->onFieldStorageDefinitionDelete($version_definition);
@@ -268,6 +270,7 @@ function task_job_update_8005() {
     ->setLabel(new TranslatableMarkup('Job version'))
     ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
     ->setSetting('max_length', 128)
+    ->setInternal(TRUE)
     ->setDisplayConfigurable('view', TRUE)
     ->setDisplayConfigurable('form', TRUE);
   $storage_definition_listener->onFieldStorageDefinitionCreate($definition);

@@ -29,6 +29,7 @@ function task_job_entity_base_field_info(EntityTypeInterface $entity_type) {
       ->setLabel(new TranslatableMarkup('Job version'))
       ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
       ->setSetting('max_length', 128)
+      ->setInternal(TRUE)
       ->setDisplayConfigurable('view', TRUE)
       ->setDisplayConfigurable('form', TRUE);
   }
