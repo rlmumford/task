@@ -5,11 +5,24 @@ namespace Drupal\task_job\Controller;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityListBuilder;
 use Drupal\Core\Render\Markup;
+use Drupal\task_job\JobInterface;
 
 /**
  * The job list builder.
  */
 class JobListBuilder extends EntityListBuilder {
+
+  /**
+   * {@inheritdoc}
+   *
+   * Versioned jobs are addressed through their explicit version routes and
+   * are deliberately omitted from the ordinary job administration list.
+   */
+  public function load() {
+    return array_filter(parent::load(), static function (EntityInterface $entity): bool {
+      return !($entity instanceof JobInterface && $entity->isVersioned());
+    });
+  }
 
   /**
    * {@inheritdoc}
