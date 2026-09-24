@@ -66,13 +66,26 @@ class JobVersionListController extends ControllerBase {
    * Builds a version table row.
    */
   protected function buildRow(JobInterface $job, string $status): array {
-    return [
-      'version' => $job->getVersion(),
-      'status' => $status,
-      'operations' => Link::fromTextAndUrl(
+    $operations = [
+      Link::fromTextAndUrl(
         $this->t('Edit'),
         Url::fromRoute('entity.task_job.edit_form', ['task_job' => $job->id()])
       )->toRenderable(),
+    ];
+    if ($job->isDirty() && $job->access('publish')) {
+      $operations[] = Link::fromTextAndUrl(
+        $this->t('Publish'),
+        Url::fromRoute('entity.task_job.publish_form', ['task_job' => $job->id()])
+      )->toRenderable();
+    }
+
+    return [
+      'version' => $job->getVersion(),
+      'status' => $status,
+      'operations' => [
+        '#theme' => 'item_list',
+        '#items' => $operations,
+      ],
     ];
   }
 
