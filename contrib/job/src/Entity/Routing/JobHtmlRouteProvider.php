@@ -80,6 +80,24 @@ class JobHtmlRouteProvider extends DefaultHtmlRouteProvider {
   }
 
   /**
+   * Define the publish form route.
+   */
+  protected function getPublishFormRoute(EntityTypeInterface $entity_type) {
+    if ($entity_type->hasLinkTemplate('publish-form') && $entity_type->getFormClass('publish')) {
+      $entity_type_id = $entity_type->id();
+      return (new Route($entity_type->getLinkTemplate('publish-form')))
+        ->setDefaults([
+          '_entity_form' => "{$entity_type_id}.publish",
+          '_title_callback' => '\Drupal\Core\Entity\Controller\EntityController::editTitle',
+        ])
+        ->setRequirement('_entity_access', "{$entity_type_id}.publish")
+        ->setOption('parameters', [
+          $entity_type_id => ['type' => 'entity:' . $entity_type_id],
+        ]);
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function getRoutes(EntityTypeInterface $entity_type) {
@@ -90,6 +108,9 @@ class JobHtmlRouteProvider extends DefaultHtmlRouteProvider {
     }
     if ($route = $this->getDisableFormRoute($entity_type)) {
       $collection->add("entity.{$entity_type->id()}.disable_form", $route);
+    }
+    if ($route = $this->getPublishFormRoute($entity_type)) {
+      $collection->add("entity.{$entity_type->id()}.publish_form", $route);
     }
 
     return $collection;

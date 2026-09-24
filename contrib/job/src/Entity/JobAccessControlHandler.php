@@ -29,7 +29,7 @@ class JobAccessControlHandler extends EntityAccessControlHandler {
         ->addCacheableDependency($entity);
     }
 
-    if (in_array($operation, ['enable', 'disable'])) {
+    if (in_array($operation, ['enable', 'disable', 'publish'])) {
       $operation = 'update';
     }
 

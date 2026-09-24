@@ -54,6 +54,7 @@ use Drupal\typed_data\Context\ContextDefinition;
  *        "delete" = "\Drupal\Core\Entity\EntityDeleteForm",
  *        "disable" = "\Drupal\task_job\Form\JobDisableForm",
  *        "enable" = "\Drupal\task_job\Form\JobEnableForm",
+ *        "publish" = "\Drupal\task_job\Form\JobPublishForm",
  *      },
  *     "route_provider" = {
  *       "html" = "Drupal\task_job\Entity\Routing\JobHtmlRouteProvider",
@@ -67,6 +68,7 @@ use Drupal\typed_data\Context\ContextDefinition;
  *     "edit-form" = "/admin/config/task/job/{task_job}/edit",
  *     "disable-form" = "/admin/config/task/job/{task_job}/disable",
  *     "enable-form" = "/admin/config/task/job/{task_job}/enable",
+ *     "publish-form" = "/admin/config/task/job/{task_job}/publish",
  *     "delete-form" = "/admin/config/task/job/{task_job}/delete",
  *   }
  * );

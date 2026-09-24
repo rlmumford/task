@@ -650,6 +650,15 @@ class JobEditForm extends JobForm {
       ];
     }
 
+    if ($this->entity->isDirty()) {
+      $actions['publish'] = [
+        '#type' => 'link',
+        '#title' => $this->t('Publish version'),
+        '#url' => $this->entity->toUrl('publish-form'),
+        '#attributes' => ['class' => ['button']],
+      ];
+    }
+
     return $actions;
   }
 
