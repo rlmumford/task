@@ -18,6 +18,7 @@ use Drupal\Core\Url;
 use Drupal\entity_template\BlueprintTempstoreRepository;
 use Drupal\entity_template\TemplateBlueprintProviderManager;
 use Drupal\task_job\JobInterface;
+use Drupal\task_job\JobVersionResolverInterface;
 use Drupal\task_job\Plugin\EntityTemplate\BlueprintProvider\BlueprintStorageJobTriggerAdaptor;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerManager;
 use Drupal\task_job\Plugin\JobTrigger\Missing;
@@ -87,6 +88,13 @@ class JobEditForm extends JobForm {
   protected $jobTriggerManager;
 
   /**
+   * The job version resolver.
+   *
+   * @var \Drupal\task_job\JobVersionResolverInterface
+   */
+  protected $jobVersionResolver;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
@@ -96,7 +104,8 @@ class JobEditForm extends JobForm {
       $container->get('plugin.manager.entity_template.blueprint_provider'),
       $container->get('entity_template.blueprint_tempstore_repository'),
       $container->get('plugin_form.factory'),
-      $container->get('plugin.manager.task_job.trigger')
+      $container->get('plugin.manager.task_job.trigger'),
+      $container->get('task_job.version_resolver')
     );
   }
 
@@ -115,6 +124,8 @@ class JobEditForm extends JobForm {
    *   The plugin form factory service.
    * @param \Drupal\task_job\Plugin\JobTrigger\JobTriggerManager $job_trigger_manager
    *   The job trigger manager service.
+   * @param \Drupal\task_job\JobVersionResolverInterface $job_version_resolver
+   *   The job version resolver.
    */
   public function __construct(
     TaskJobTempstoreRepository $tempstore_repository,
@@ -122,7 +133,8 @@ class JobEditForm extends JobForm {
     TemplateBlueprintProviderManager $blueprint_provider_manager,
     BlueprintTempstoreRepository $blueprint_tempstore_repository,
     PluginFormFactoryInterface $plugin_form_factory,
-    JobTriggerManager $job_trigger_manager
+    JobTriggerManager $job_trigger_manager,
+    JobVersionResolverInterface $job_version_resolver,
   ) {
     $this->tempstoreRepository = $tempstore_repository;
     $this->blueprintTempstoreRepository = $blueprint_tempstore_repository;
@@ -130,6 +142,7 @@ class JobEditForm extends JobForm {
     $this->blueprintProviderManager = $blueprint_provider_manager;
     $this->pluginFormFactory = $plugin_form_factory;
     $this->jobTriggerManager = $job_trigger_manager;
+    $this->jobVersionResolver = $job_version_resolver;
   }
 
   /**
@@ -138,6 +151,16 @@ class JobEditForm extends JobForm {
   public function setEntity(EntityInterface $entity) {
     if (!($entity instanceof JobInterface)) {
       throw new \InvalidArgumentException('This form can only be used with job entities.');
+    }
+
+    if ($entity->isVersioned() && !$entity->isDirty()) {
+      $version = $entity->getVersion();
+      $dirty = $this->jobVersionResolver->load($entity->getBaseJobId(), $version);
+      if (!$dirty->isDirty()) {
+        $dirty = $this->jobVersionResolver->createDirtyVersion($entity);
+        $dirty->save();
+      }
+      $entity = $dirty;
     }
 
     if ($this->tempstoreRepository->has($entity)) {
@@ -692,7 +715,7 @@ class JobEditForm extends JobForm {
     }
 
     $triggers_config = [];
-    foreach ($this->blueprintStorages as $key => $storage) {
+    foreach ($this->blueprintStorages as $storage) {
       $trigger = $storage->getTrigger();
 
       $triggers_config[$key] = [
@@ -711,7 +734,7 @@ class JobEditForm extends JobForm {
   public function save(array $form, FormStateInterface $form_state) {
     $return = parent::save($form, $form_state);
 
-    foreach ($this->blueprintStorages as $key => $storage) {
+    foreach ($this->blueprintStorages as $storage) {
       $this->blueprintTempstoreRepository->delete($storage);
     }
     $this->tempstoreRepository->delete($this->entity);
@@ -730,7 +753,7 @@ class JobEditForm extends JobForm {
    *   The form state.
    */
   public function submitFormCancel(array $form, FormStateInterface $form_state) {
-    foreach ($this->blueprintStorages as $key => $storage) {
+    foreach ($this->blueprintStorages as $storage) {
       $this->blueprintTempstoreRepository->delete($storage);
     }
     $this->tempstoreRepository->delete($this->entity);
