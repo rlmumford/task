@@ -16,6 +16,7 @@ services:
     arguments: ['@tempstore.shared']
   task_job.collect_resources_subscriber:
     class: Drupal\task_job\EventSubscriber\CollectResourcesSubscriber
+    arguments: ['@task.resource_manager']
     tags:
       - { name: event_subscriber }
   plugin.manager.task_job.trigger:

@@ -2,6 +2,7 @@
 
 namespace Drupal\Tests\task\Kernel;
 
+use Drupal\checklist\ChecklistActionResource;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Cache\Cache;
@@ -89,6 +90,40 @@ class TaskIntegrationTest extends KernelTestBase {
     $checklist->getItem('review')->setComplete()->save();
     $checklist->complete();
     $this->assertSame('resolved', $task->status->value);
+  }
+
+  /**
+   * Configured job resources are available in the task checklist pane.
+   */
+  public function testJobResourcesAreIncludedInChecklistResources(): void {
+    $job = Job::create([
+      'id' => 'resource_job',
+      'label' => 'Resource job',
+      'resources' => [
+        'powered' => ['id' => 'system_powered_by_block'],
+      ],
+      'default_checklist' => [
+        'review' => [
+          'label' => 'Review the request',
+          'handler' => 'simply_checkable',
+          'handler_configuration' => [],
+        ],
+      ],
+    ]);
+    $job->save();
+    $task = Task::create(['title' => 'Review request', 'job' => $job]);
+    $task->save();
+
+    $resources = $this->container
+      ->get('checklist.action_resource_collector')
+      ->collect($task->checklist->checklist);
+
+    $this->assertArrayHasKey('task__job__powered', $resources);
+    $resource = $resources['task__job__powered']['resource'];
+    $this->assertInstanceOf(ChecklistActionResource::class, $resource);
+    $this->assertNotEmpty($resource->getLabel());
+    $this->assertArrayHasKey('#pre_render', $resource->getContent());
+    $this->assertSame([], $resources['task__job__powered']['owners']);
   }
 
   /**
