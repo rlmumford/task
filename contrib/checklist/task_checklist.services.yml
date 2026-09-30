@@ -1,8 +1,21 @@
 services:
   task_checklist.task_processor:
     class: Drupal\task_checklist\TaskChecklistProcessor
-    arguments: [ '@module_handler', '@event_dispatcher', '@logger.factory', '@task.readiness', '@entity_type.manager' ]
+    arguments: [ '@module_handler', '@event_dispatcher', '@task.readiness', '@entity_type.manager' ]
   task_checklist.task_checklist.subscriber:
     class: Drupal\task_checklist\EventSubscriber\TaskChecklistSubscriber
     tags:
       - { name: event_subscriber }
+
+  task_checklist.request_storage:
+    class: Drupal\task_checklist\TaskChecklistRequestStorage
+    arguments: ['@database', '@datetime.time']
+  task_checklist.scheduler:
+    class: Drupal\task_checklist\TaskChecklistScheduler
+    arguments: ['@task_checklist.request_storage', '@queue', '@logger.channel.task_checklist']
+  logger.channel.task_checklist:
+    parent: logger.channel_base
+    arguments: ['task_checklist']
+  task_checklist.request_runner:
+    class: Drupal\task_checklist\TaskChecklistRequestRunner
+    arguments: ['@task_checklist.request_storage', '@entity_type.manager', '@account_switcher', '@lock', '@task_checklist.task_processor']

@@ -1,10 +1,14 @@
 <?php
 
-use Drupal\Core\Datetime\DrupalDateTime;
+/**
+ * @file
+ * Task checklist fields, configuration and durable processing requests.
+ */
+
+use Drupal\checklist\Entity\ChecklistItemInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Drupal\entity\BundleFieldDefinition;
 use Drupal\task\Entity\Task;
 
@@ -52,7 +56,9 @@ function task_checklist_form_task_configuration_form_alter(array &$form, FormSta
  * Submit to save task checklist settings.
  *
  * @param array $form
+ *   The task configuration form.
  * @param \Drupal\Core\Form\FormStateInterface $form_state
+ *   The submitted form state.
  */
 function task_checklist_form_task_configuration_form_submit(array $form, FormStateInterface $form_state) {
   \Drupal::configFactory()->getEditable('task_checklist.defaults')
@@ -64,12 +70,71 @@ function task_checklist_form_task_configuration_form_submit(array $form, FormSta
  * Implements hook_task_update().
  */
 function task_checklist_task_update(Task $task) {
-  \Drupal::service('task_checklist.task_processor')->processTask($task);
+  _task_checklist_request($task);
 }
 
 /**
  * Implements hook_task_insert().
  */
 function task_checklist_task_insert(Task $task) {
-  \Drupal::service('task_checklist.task_processor')->processTask($task);
+  _task_checklist_request($task);
+}
+
+/**
+ * Records active work; the worker rechecks the candidate account's access.
+ */
+function _task_checklist_request(Task $task): void {
+  if (!$task->isNew() && $task->isDefaultRevision() && $task->status->value === 'active' && !$task->checklist->isEmpty()) {
+    $executor = (int) (\Drupal::currentUser()->id() ?: $task->creator->target_id);
+    if ($executor > 0) {
+      \Drupal::service('task_checklist.request_storage')->request((int) $task->id(), $task->uuid(), $executor);
+    }
+  }
+}
+
+/**
+ * Implements hook_checklist_item_insert().
+ */
+function task_checklist_checklist_item_insert(ChecklistItemInterface $item): void {
+  _task_checklist_item_changed($item);
+}
+
+/**
+ * Implements hook_checklist_item_update().
+ */
+function task_checklist_checklist_item_update(ChecklistItemInterface $item): void {
+  $original = $item->original;
+  if ($item->get('status')->getValue() !== $original->get('status')->getValue()
+    || $item->get('outcomes')->getValue() !== $original->get('outcomes')->getValue()) {
+    _task_checklist_item_changed($item);
+  }
+}
+
+/**
+ * Wakes the main task checklist when persisted item results change.
+ */
+function _task_checklist_item_changed(ChecklistItemInterface $item): void {
+  $reference = $item->get('checklist');
+  if ($reference->getFieldDefinition()->getSetting('target_type') === 'task'
+    && in_array($reference->checklist_key, ['checklist', 'checklist:0'], TRUE)
+    && $reference->target_id) {
+    $task = \Drupal::entityTypeManager()->getStorage('task')->loadUnchanged($reference->target_id);
+    if ($task) {
+      _task_checklist_request($task);
+    }
+  }
+}
+
+/**
+ * Implements hook_task_delete().
+ */
+function task_checklist_task_delete(Task $task): void {
+  \Drupal::service('task_checklist.request_storage')->delete($task->uuid());
+}
+
+/**
+ * Implements hook_cron().
+ */
+function task_checklist_cron(): void {
+  \Drupal::service('task_checklist.scheduler')->dispatch();
 }

@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * @file
+ * Installs task checklist fields and durable processing requests.
+ */
+
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\entity\BundleFieldDefinition;
 
@@ -39,7 +44,39 @@ function task_checklist_uninstall() {
     ->setLabel(new TranslatableMarkup('Checklist'))
     ->setDisplayConfigurable('view', TRUE);
 
-
   $storage_definition_listener->onFieldStorageDefinitionDelete($definition);
   $definition_listener->onFieldDefinitionDelete($definition);
+}
+
+/**
+ * Implements hook_schema().
+ */
+function task_checklist_schema(): array {
+  return [
+    'task_checklist_request' => [
+      'description' => 'Checklist wake-ups recorded transactionally with their source changes.',
+      'fields' => [
+        'id' => ['type' => 'serial', 'size' => 'big', 'unsigned' => TRUE, 'not null' => TRUE],
+        'task_id' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE],
+        'task_uuid' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'executor' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE],
+        'dispatch_expires' => ['type' => 'int', 'size' => 'big', 'not null' => TRUE, 'default' => 0],
+      ],
+      'primary key' => ['id'],
+      'indexes' => [
+        'dispatch' => ['dispatch_expires', 'id'],
+        'task_executor' => ['task_uuid', 'executor', 'id'],
+      ],
+    ],
+  ];
+}
+
+/**
+ * Installs durable task checklist processing requests.
+ */
+function task_checklist_update_10001(): void {
+  $schema = \Drupal::database()->schema();
+  if (!$schema->tableExists('task_checklist_request')) {
+    $schema->createTable('task_checklist_request', task_checklist_schema()['task_checklist_request']);
+  }
 }

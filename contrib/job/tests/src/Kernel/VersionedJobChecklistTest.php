@@ -18,6 +18,8 @@ class VersionedJobChecklistTest extends KernelTestBase {
     'system', 'user', 'field', 'text', 'filter', 'options', 'datetime',
     'entity', 'task', 'task_context', 'task_checklist', 'checklist',
     'task_job', 'entity_template', 'typed_data', 'typed_data_plus', 'views',
+    'plugin_reference', 'typed_data_reference', 'typed_data_context_assignment',
+    'inline_entity_form',
   ];
 
   /**
@@ -25,6 +27,7 @@ class VersionedJobChecklistTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installSchema('task_checklist', ['task_checklist_request']);
 
     $this->installSchema('task_job', ['task_job_trigger_index']);
     foreach (['user', 'task', 'checklist_item'] as $entity_type) {
@@ -67,7 +70,7 @@ class VersionedJobChecklistTest extends KernelTestBase {
     ]);
     $task->save();
 
-    $this->assertSame('Version 6 review', $task->checklist->checklist->getItem('review')->label());
+    $this->assertSame('Version 6 review', $task->checklist->checklist->getItem('review')->get('title')->value);
 
     $version_seven = $resolver->createVersion($base, '7');
     $version_seven->set('default_checklist', [
@@ -79,8 +82,8 @@ class VersionedJobChecklistTest extends KernelTestBase {
     ]);
     $version_seven->save();
 
-    $task = Task::load($task->id());
-    $this->assertSame('Version 6 review', $task->checklist->checklist->getItem('review')->label());
+    $task = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id());
+    $this->assertSame('Version 6 review', $task->checklist->checklist->getItem('review')->get('title')->value);
 
     $dirty = $resolver->createDirtyVersion($version_six);
     $dirty->set('default_checklist', [
@@ -92,8 +95,8 @@ class VersionedJobChecklistTest extends KernelTestBase {
     ]);
     $dirty->save();
 
-    $task = Task::load($task->id());
-    $this->assertSame('Version 6 dirty review', $task->checklist->checklist->getItem('review')->label());
+    $task = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id());
+    $this->assertSame('Version 6 dirty review', $task->checklist->checklist->getItem('review')->get('title')->value);
   }
 
 }

@@ -40,6 +40,7 @@ class TaskIntegrationTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installSchema('task_checklist', ['task_checklist_request']);
     $this->installSchema('service', ['service_hierarchy_lock']);
     $this->container->get('database')->insert('service_hierarchy_lock')->fields(['id' => 1])->execute();
     $this->installSchema('task_job', ['task_job_trigger_index']);
@@ -342,6 +343,8 @@ class TaskIntegrationTest extends KernelTestBase {
     $processor->processTask($task);
     $this->assertSame('pending', Task::load($task->id())->status->value);
     $held->set('start', '2000-01-01T00:00:00')->save();
+    $this->assertSame('active', Task::load($task->id())->status->value);
+    $processor->processTask($held);
     $this->assertSame('resolved', Task::load($task->id())->status->value);
   }
 

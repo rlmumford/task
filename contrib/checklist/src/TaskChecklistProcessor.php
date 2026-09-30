@@ -4,7 +4,6 @@ namespace Drupal\task_checklist;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\task\TaskReadiness;
 use Drupal\task\Entity\Task;
 use Drupal\task_checklist\Event\TaskChecklistEnvironmentDetectionEvent;
@@ -31,21 +30,12 @@ class TaskChecklistProcessor implements TaskChecklistProcessorInterface {
   protected $eventDispatcher;
 
   /**
-   * The logger.
-   *
-   * @var \Drupal\Core\Logger\LoggerChannelInterface
-   */
-  protected $logger;
-
-  /**
    * TaskChecklistProcessor constructor.
    *
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
    *   The event dispatcher.
-   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_channel_factory
-   *   The logger channel factory.
    * @param \Drupal\task\TaskReadiness $readiness
    *   The task readiness evaluator.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
@@ -54,13 +44,11 @@ class TaskChecklistProcessor implements TaskChecklistProcessorInterface {
   public function __construct(
     ModuleHandlerInterface $module_handler,
     EventDispatcherInterface $event_dispatcher,
-    LoggerChannelFactoryInterface $logger_channel_factory,
     protected TaskReadiness $readiness,
     protected EntityTypeManagerInterface $entityTypeManager,
   ) {
     $this->moduleHandler = $module_handler;
     $this->eventDispatcher = $event_dispatcher;
-    $this->logger = $logger_channel_factory->get('task_checklist');
   }
 
   /**
@@ -81,28 +69,26 @@ class TaskChecklistProcessor implements TaskChecklistProcessorInterface {
       return;
     }
     if ($readiness->state === 'active') {
-      if ($this->moduleHandler->moduleExists('exec_environment')) {
-        $environment = new TaskChecklistEnvironmentDetectionEvent($task);
-        $this->eventDispatcher->dispatch($environment, TaskChecklistEvents::DETECT_CHECKLIST_ENVIRONMENT);
-        $environment->applyEnvironment();
-      }
-
-      // Process the checklist if it exists.
-      if (!$task->checklist->isEmpty() && $checklist = $task->checklist->checklist) {
-        /** @var \Drupal\checklist\ChecklistInterface $checklist */
-        try {
+      try {
+        if ($this->moduleHandler->moduleExists('exec_environment')) {
+          $environment = new TaskChecklistEnvironmentDetectionEvent($task);
+          $this->eventDispatcher->dispatch($environment, TaskChecklistEvents::DETECT_CHECKLIST_ENVIRONMENT);
+          $environment->applyEnvironment();
+        }
+        if (!$task->checklist->isEmpty() && $checklist = $task->checklist->checklist) {
+          // Persist item identity before submitting automatic work.
+          foreach ($checklist->getOrderedItems() as $item) {
+            if ($item->isNew() && $item->access('execute iteration')) {
+              $item->save();
+            }
+          }
           $checklist->process();
         }
-        catch (\Exception $e) {
-          $this->logger->error(
-            "Exception when processing task checklist for task {$task->id()}.\nMessage: {$e->getMessage()}\nTrace: {$e->getTraceAsString()}"
-          );
-        }
       }
-
-      // Reset the environment.
-      if (isset($environment)) {
-        $environment->resetEnvironment();
+      finally {
+        if (isset($environment)) {
+          $environment->resetEnvironment();
+        }
       }
     }
   }

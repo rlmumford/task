@@ -121,6 +121,7 @@ class JobVersionResolver implements JobVersionResolverInterface {
   public function createVersion(JobInterface $job, string $version): JobInterface {
     $base_id = JobVersionId::base($job->id());
     $values = $job->toArray();
+    unset($values['uuid']);
     $values['id'] = JobVersionId::build($base_id, $version);
     $values['version'] = $version;
     $values['version_of'] = $base_id;
@@ -144,6 +145,7 @@ class JobVersionResolver implements JobVersionResolverInterface {
 
     $base_id = JobVersionId::base($job->id());
     $values = $job->toArray();
+    unset($values['uuid']);
     $values['id'] = JobVersionId::buildDirty($base_id, $version);
     $values['version'] = $version;
     $values['version_of'] = $base_id;
