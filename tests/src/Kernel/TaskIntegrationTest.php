@@ -301,6 +301,9 @@ class TaskIntegrationTest extends KernelTestBase {
    * Processing respects dependencies, service changes and a postponed start.
    */
   public function testChecklistReadinessGates(): void {
+    $account = User::create(['name' => 'Processor', 'status' => 1]);
+    $account->save();
+    $this->container->get('current_user')->setAccount($account);
     ServiceType::create(['id' => 'work', 'label' => 'Work'])->save();
     $service = Service::create(['type' => 'work']);
     $service->save();
