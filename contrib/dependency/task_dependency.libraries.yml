@@ -1,0 +1,4 @@
+editor:
+  css:
+    theme:
+      css/dependency-editor.css: {}

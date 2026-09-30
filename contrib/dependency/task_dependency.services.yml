@@ -1,0 +1,21 @@
+services:
+  plugin.manager.task_dependency.trigger:
+    class: Drupal\task_dependency\TriggerManager
+    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler']
+  task_dependency.workflow:
+    class: Drupal\task_dependency\WorkflowStorage
+    arguments: ['@database', '@uuid', '@datetime.time', '@current_user']
+  task_dependency.manager:
+    class: Drupal\task_dependency\DependencyManager
+    arguments: ['@entity_type.manager', '@plugin.manager.task_dependency.trigger', '@task_dependency.workflow', '@database', '@uuid', '@datetime.time']
+  task_dependency.scheduler:
+    class: Drupal\task_dependency\DependencyScheduler
+    arguments: ['@task_dependency.workflow', '@queue', '@entity_type.manager', '@account_switcher']
+  task_dependency.readiness:
+    class: Drupal\task_dependency\EventSubscriber\ReadinessSubscriber
+    arguments: ['@entity_type.manager']
+    tags:
+      - { name: event_subscriber }
+  task_dependency.editor:
+    class: Drupal\task_dependency\DependencyEditor
+    arguments: ['@task_dependency.manager', '@entity_type.manager', '@plugin.manager.task_dependency.trigger']

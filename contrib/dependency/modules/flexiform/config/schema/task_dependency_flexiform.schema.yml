@@ -1,0 +1,7 @@
+flexiform.component.task_dependencies:
+  type: flexiform.component
+  label: 'Task dependencies'
+  mapping:
+    context:
+      type: string
+      label: 'Task context'

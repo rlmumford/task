@@ -1,0 +1,114 @@
+<?php
+
+/**
+ * @file
+ * Indexed dependency references, source notifications and readiness dispatch.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\task\TaskInterface;
+use Drupal\task_dependency\Entity\Dependency;
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function task_dependency_entity_base_field_info(EntityTypeInterface $type): array {
+  if ($type->id() !== 'task') {
+    return [];
+  }
+  return [
+    'event_dependencies' => BaseFieldDefinition::create('entity_reference')
+      ->setLabel(t('Event dependencies'))
+      ->setSetting('target_type', 'task_dependency')
+      ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+      ->setDisplayOptions('form', ['type' => 'task_dependencies', 'weight' => 20])
+      ->setDisplayConfigurable('form', TRUE),
+  ];
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function task_dependency_entity_update(EntityInterface $entity): void {
+  if ($entity->getEntityTypeId() !== 'task_dependency') {
+    \Drupal::service('task_dependency.manager')->observe($entity);
+  }
+}
+
+/**
+ * Implements hook_task_dependency_presave().
+ */
+function task_dependency_task_dependency_presave(Dependency $dependency): void {
+  \Drupal::service('task_dependency.manager')->presave($dependency);
+}
+
+/**
+ * Implements hook_task_dependency_insert().
+ */
+function task_dependency_task_dependency_insert(Dependency $dependency): void {
+  \Drupal::service('task_dependency.workflow')->record($dependency, 'registered', [
+    'bindings' => $dependency->get('bindings')->getValue(),
+    'action' => $dependency->get('action')->value,
+  ]);
+  \Drupal::service('task_dependency.workflow')->request($dependency->get('owner')->value);
+}
+
+/**
+ * Implements hook_task_presave().
+ */
+function task_dependency_task_presave(TaskInterface $task): void {
+  if (!$task->isDefaultRevision() && isset($task->original)
+    && $task->get('event_dependencies')->getValue() !== $task->original->get('event_dependencies')->getValue()) {
+    throw new \InvalidArgumentException('Dependency changes must be saved on the default task revision.');
+  }
+  foreach ($task->get('event_dependencies')->referencedEntities() as $dependency) {
+    if ($dependency->get('owner')->value !== $task->uuid()) {
+      throw new \InvalidArgumentException('Dependency records cannot be shared between tasks.');
+    }
+  }
+}
+
+/**
+ * Implements hook_task_update().
+ */
+function task_dependency_task_update(TaskInterface $task): void {
+  if (!$task->isDefaultRevision()) {
+    return;
+  }
+  $keep = array_column($task->get('event_dependencies')->getValue(), 'target_id');
+  $storage = \Drupal::entityTypeManager()->getStorage('task_dependency');
+  foreach ($storage->loadByProperties(['owner' => $task->uuid()]) as $dependency) {
+    if (!in_array($dependency->id(), $keep, TRUE)) {
+      \Drupal::service('task_dependency.workflow')->record($dependency, 'removed');
+      $dependency->delete();
+    }
+  }
+}
+
+/**
+ * Implements hook_task_delete().
+ */
+function task_dependency_task_delete(TaskInterface $task): void {
+  $storage = \Drupal::entityTypeManager()->getStorage('task_dependency');
+  foreach ($storage->loadByProperties(['owner' => $task->uuid()]) as $dependency) {
+    \Drupal::service('task_dependency.workflow')->record($dependency, 'owner_deleted');
+    $dependency->delete();
+  }
+}
+
+/**
+ * Implements hook_cron().
+ */
+function task_dependency_cron(): void {
+  \Drupal::service('task_dependency.scheduler')->dispatch();
+}
+
+/**
+ * Implements hook_task_storage_prewrite().
+ */
+function task_dependency_task_storage_prewrite(TaskInterface $task): void {
+  \Drupal::service('task_dependency.manager')->validateTask($task);
+}

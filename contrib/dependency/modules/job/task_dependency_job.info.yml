@@ -1,0 +1,7 @@
+name: Dependency events for job triggers
+type: module
+package: Tasks
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task:task_job
+  - task:task_dependency_template

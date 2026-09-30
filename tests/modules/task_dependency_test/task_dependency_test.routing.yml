@@ -1,0 +1,11 @@
+task_dependency_test.editor:
+  path: '/task/{task}/dependency-editor'
+  defaults:
+    _controller: '\Drupal\task_dependency_test\Controller\Editor::build'
+    _title: 'Task dependencies — Flexiform'
+  requirements:
+    _entity_access: 'task.update'
+  options:
+    parameters:
+      task:
+        type: entity:task

@@ -1,0 +1,7 @@
+name: Task dependencies
+type: module
+description: Indexed event subscriptions that activate or invalidate tasks.
+package: Tasks
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task:task

@@ -1,0 +1,8 @@
+name: Task dependency templates
+type: module
+package: Tasks
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task:task_dependency
+  - entity_template:entity_template
+  - typed_data_plus:typed_data_context_assignment

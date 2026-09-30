@@ -1,0 +1,6 @@
+name: Task dependency test
+package: Testing
+type: module
+core_version_requirement: ^10.3 || ^11
+dependencies:
+  - task:task_dependency_flexiform

@@ -13,7 +13,7 @@ use Drupal\entity_template\Blueprint;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\Plugin\EntityTemplate\Builder\JobTaskBuilder;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerInterface;
-use Drupal\typed_data\Context\ContextDefinition;
+use Drupal\Core\Plugin\Context\ContextDefinition;
 
 /**
  * Blueprint adapter for job triggers.

@@ -1,0 +1,17 @@
+task_job.trigger.dependency_event:*:
+  type: task_job.trigger
+  label: 'Workflow event trigger'
+  mapping:
+    event_configuration:
+      type: mapping
+      label: 'Event matching'
+      mapping:
+        field:
+          type: string
+          label: 'State field'
+        property:
+          type: string
+          label: 'State property'
+        value:
+          type: string
+          label: 'Qualifying value'

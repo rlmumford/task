@@ -1,0 +1,70 @@
+.task-dependencies-widget .field-multiple-table {
+  width: 100%;
+}
+
+.task-dependencies-widget .field-multiple-table td.field-multiple-drag {
+  width: 2rem;
+}
+
+.task-dependencies-widget .field-multiple-table td:has(.task-dependency-editor) {
+  width: 100%;
+}
+
+.task-dependency-editor {
+  box-sizing: border-box;
+  width: auto;
+}
+
+.task-dependency-editor > .details-wrapper {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1.5rem;
+}
+
+.task-dependency-editor .form-item {
+  margin: 0.65rem 0;
+}
+
+.task-dependency-editor input:not([type="checkbox"]),
+.task-dependency-editor select {
+  max-width: 100%;
+}
+
+.task-dependency-editor p {
+  grid-column: 1 / -1;
+  color: #505a66;
+}
+
+@media (max-width: 640px) {
+  .task-dependency-editor > .details-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .task-dependencies-widget .field-multiple-table,
+  .task-dependencies-widget .field-multiple-table tbody,
+  .task-dependencies-widget .field-multiple-table tr,
+  .task-dependencies-widget .field-multiple-table td {
+    display: block;
+    height: auto;
+  }
+
+  .task-dependencies-widget .field-multiple-table td {
+    padding: 0.5rem 0;
+  }
+
+  .task-dependencies-widget .field-multiple-table td.field-multiple-drag {
+    display: none;
+  }
+
+  .task-dependencies-widget .field-multiple-table td:has(.task-dependency-editor) {
+    width: auto;
+  }
+
+  .task-dependencies-widget .task-dependency-editor {
+    margin: 0;
+  }
+
+  .task-dependencies-widget .task-dependency-editor .details-wrapper {
+    padding: 1rem;
+  }
+}

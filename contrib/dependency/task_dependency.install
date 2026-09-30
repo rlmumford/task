@@ -1,0 +1,51 @@
+<?php
+
+/**
+ * @file
+ * Transactional event matching and task reevaluation storage.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function task_dependency_schema(): array {
+  return [
+    'task_dependency_target_lock' => [
+      'fields' => ['target' => ['type' => 'varchar_ascii', 'length' => 64, 'not null' => TRUE]],
+      'primary key' => ['target'],
+    ],
+    'task_dependency_request' => [
+      'fields' => [
+        'uuid' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'owner' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'expires' => ['type' => 'int', 'size' => 'big', 'not null' => TRUE, 'default' => 0],
+      ],
+      'primary key' => ['uuid'],
+      'indexes' => ['dispatch' => ['expires'], 'owner' => ['owner']],
+    ],
+    'task_dependency_history' => [
+      'fields' => [
+        'uuid' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'dependency' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'owner' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'operation' => ['type' => 'varchar_ascii', 'length' => 32, 'not null' => TRUE],
+        'created' => ['type' => 'int', 'size' => 'big', 'not null' => TRUE],
+        'actor' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE],
+        'details' => ['type' => 'text', 'not null' => TRUE],
+      ],
+      'primary key' => ['uuid'],
+      'indexes' => ['dependency' => ['dependency'], 'owner' => ['owner']],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_install().
+ */
+function task_dependency_install(): void {
+  $manager = \Drupal::entityDefinitionUpdateManager();
+  if (!$manager->getFieldStorageDefinition('event_dependencies', 'task')) {
+    $definition = task_dependency_entity_base_field_info(\Drupal::entityTypeManager()->getDefinition('task'))['event_dependencies'];
+    $manager->installFieldStorageDefinition('event_dependencies', 'task', 'task_dependency', $definition);
+  }
+}
