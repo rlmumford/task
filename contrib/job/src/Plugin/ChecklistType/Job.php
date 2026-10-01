@@ -119,6 +119,7 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
           [
             'checklist_type' => $this->getPluginId(),
             'name' => $name,
+            'derivation' => $config['derivation'] ?? [],
             'title' => $config['label'],
             'handler' => [
               'id' => $config['handler'],

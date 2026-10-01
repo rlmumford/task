@@ -5,6 +5,7 @@ namespace Drupal\task_job\EventSubscriber;
 use Drupal\checklist\ChecklistActionResource;
 use Drupal\checklist\Event\ChecklistCollectResourcesEvent;
 use Drupal\checklist\Event\ChecklistEvents;
+use Drupal\Core\Render\Element;
 use Drupal\task\Event\CollectResourcesEvent;
 use Drupal\task\Event\TaskEvents;
 use Drupal\task\TaskInterface;
@@ -68,7 +69,9 @@ class CollectResourcesSubscriber implements EventSubscriberInterface {
       return;
     }
 
-    foreach ($this->resourceManager->buildTaskResources($task) as $key => $build) {
+    $builds = $this->resourceManager->buildTaskResources($task);
+    foreach (Element::children($builds) as $key) {
+      $build = $builds[$key];
       $plugin = $build['#block_plugin'] ?? NULL;
       $label = $plugin ? $plugin->label() : ($build['#configuration']['label'] ?? $build['#plugin_id'] ?? $key);
       $event->addResource(new ChecklistActionResource(

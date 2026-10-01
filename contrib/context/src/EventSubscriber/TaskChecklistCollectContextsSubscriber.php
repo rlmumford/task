@@ -6,14 +6,13 @@ use Drupal\checklist\Event\ChecklistCollectContextsEventInterface;
 use Drupal\checklist\Event\ChecklistEvents;
 use Drupal\Core\Plugin\Context\Context;
 use Drupal\task\Entity\Task;
-use Drupal\typed_data_reference\TypedDataDefinitionToContextDefinitionTrait;
+use Drupal\typed_data_plus\Plugin\Context\DataContextDefinition;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
  * Event subscriber to expose task context to checklists.
  */
 class TaskChecklistCollectContextsSubscriber implements EventSubscriberInterface {
-  use TypedDataDefinitionToContextDefinitionTrait;
 
   /**
    * {@inheritdoc}
@@ -44,7 +43,7 @@ class TaskChecklistCollectContextsSubscriber implements EventSubscriberInterface
         $event->addContext(
           "task_context:{$context_name}",
           new Context(
-            $this->contextDefinitionForDataDefinition($data_definition),
+            DataContextDefinition::fromDataDefinition($data_definition),
             $entity->get('context')->get($context_name)->getValue()
           )
         );

@@ -8,6 +8,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\SubformState;
 use Drupal\task_job\JobConfigurationChecklist;
 use Drupal\task_job\JobInterface;
+use Drupal\task_job\JobChecklistExpansion;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -154,6 +155,30 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
       }
     }
     $form_state->set('checklist_conditions', $gates);
+    if (!$form_state->hasAnyErrors() && $form_state->get('configured_plugin')->getPluginId() === 'decision') {
+      $candidate = clone $form_state->get('job');
+      $template = $form_state->get('checklist_template');
+      $items = $candidate->getChecklistItems($template);
+      $plugin = $form_state->get('configured_plugin');
+      $items[$name] = [
+        'name' => $name,
+        'label' => $form_state->getValue('label'),
+        'handler' => $plugin->getPluginId(),
+        'handler_configuration' => $form['plugin_configuration']['#validated_configuration'] ?? $plugin->getConfiguration(),
+      ];
+      $candidate->setChecklistItems($items, $template);
+      try {
+        $candidate->getExpandedChecklistItems();
+        // Also validate a template not yet referenced by the main checklist.
+        if ($template !== NULL) {
+          JobChecklistExpansion::expand($items, $candidate->get('checklist_templates') ?: []);
+        }
+      }
+      catch (\InvalidArgumentException $exception) {
+        $form_state->setErrorByName('plugin_configuration', $exception->getMessage());
+      }
+    }
+
   }
 
   /**

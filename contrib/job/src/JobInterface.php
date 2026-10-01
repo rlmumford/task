@@ -79,7 +79,7 @@ interface JobInterface extends ConfigEntityInterface {
   public function setChecklistItems(array $items, ?string $template = NULL): void;
 
   /**
-   * Assembles static inclusions, rejecting missing templates and collisions.
+   * Assembles static and decision branches, rejecting cycles and collisions.
    */
   public function getExpandedChecklistItems(): array;
 

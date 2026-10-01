@@ -753,6 +753,23 @@ class JobEditForm extends JobForm {
    */
   public function validateTemplateRemoval(array &$form, FormStateInterface $form_state): void {
     $name = $form_state->getTriggeringElement()['#template_name'];
+    $definitions = [$this->entity->getChecklistItems()];
+    foreach ($this->entity->get('checklist_templates') ?: [] as $template) {
+      $definitions[] = $template['items'] ?? [];
+    }
+    foreach ($definitions as $items) {
+      foreach ($items as $item) {
+        if ($item['handler'] !== 'decision') {
+          continue;
+        }
+        foreach ($item['handler_configuration']['options'] ?? [] as $option) {
+          if (($option['template'] ?? '') === $name) {
+            $form_state->setErrorByName('templates', $this->t('Remove this template from decision choices before deleting it.'));
+            return;
+          }
+        }
+      }
+    }
     if (in_array($name, $this->entity->get('checklist_includes') ?: [], TRUE)) {
       $form_state->setError($form['templates'][$name]['remove'], $this->t('Remove this template from the Checklist tab before deleting it.'));
     }

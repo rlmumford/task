@@ -300,4 +300,47 @@ class TaskJobEditFormTest extends BrowserTestBase {
     $this->assertSame(['Urgent work'], array_column($this->saved()->get('assignment_rules'), 'label'));
   }
 
+  /**
+   * Decision template selection survives tab navigation and explicit saving.
+   */
+  public function testDecisionTemplateDraft(): void {
+    $job = $this->saved();
+    $job->set('checklist_templates', [
+      'documents' => [
+        'label' => 'Collect documents',
+        'items' => [
+          'request' => [
+            'name' => 'request',
+            'label' => 'Request documents',
+            'handler' => 'simply_checkable',
+            'handler_configuration' => [],
+          ],
+        ],
+      ],
+    ])->save();
+    $this->drupalGet('/admin/config/task/job/follow_up/checklist/add/decision');
+    $this->submitForm([
+      'name' => 'review',
+      'label' => 'Review evidence',
+      'plugin_configuration[question]' => 'What is needed?',
+      'plugin_configuration[options][0][name]' => 'more',
+      'plugin_configuration[options][0][label]' => 'More documents',
+      'plugin_configuration[options][0][template]' => 'documents',
+    ], 'Add');
+    $this->assertSession()->addressEquals('/admin/config/task/job/follow_up/edit');
+    $this->assertSame([], $this->saved()->getChecklistItems());
+    $this->clickLink('Settings');
+    $this->clickLink('Checklist');
+    $this->clickLink('configure');
+    $this->assertSession()->fieldValueEquals('plugin_configuration[options][0][template]', 'documents');
+    $this->submitForm([], 'Update');
+    $this->clickLink('Checklist templates');
+    $this->clickLink('Collect documents');
+    $this->submitForm([], 'Remove template');
+    $this->assertSession()->pageTextContains('Remove this template from decision choices before deleting it.');
+    $this->submitForm([], 'Save');
+    $this->assertSame('documents', $this->saved()->getChecklistItems()['review']['handler_configuration']['options']['more']['template']);
+    $this->assertArrayHasKey('review__more__documents__request', $this->saved()->getExpandedChecklistItems());
+  }
+
 }

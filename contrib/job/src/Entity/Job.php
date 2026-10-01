@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\Core\Plugin\DefaultLazyPluginCollection;
 use Drupal\task_job\JobInterface;
+use Drupal\task_job\JobChecklistExpansion;
 use Drupal\task_job\JobVersionId;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerInterface;
 use Drupal\task_job\Plugin\JobTrigger\LazyJobTriggerCollection;
@@ -349,7 +350,7 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
         $items[$name] = $item;
       }
     }
-    return $items;
+    return JobChecklistExpansion::expand($items, $this->get('checklist_templates') ?: []);
   }
 
   /**
