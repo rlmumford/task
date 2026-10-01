@@ -74,7 +74,7 @@ class ChooseBlockController extends ControllerBase {
     EntityTypeManagerInterface $entity_type_manager,
     TaskJobTempstoreRepository $tempstore_repository,
     BlockManagerInterface $block_manager,
-    EventDispatcherInterface $event_dispatcher
+    EventDispatcherInterface $event_dispatcher,
   ) {
     $this->entityTypeManager = $entity_type_manager;
     $this->tempstoreRepository = $tempstore_repository;
@@ -95,9 +95,7 @@ class ChooseBlockController extends ControllerBase {
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
   public function build(JobInterface $task_job) {
-    if ($this->tempstoreRepository->has($task_job)) {
-      $task_job = $this->tempstoreRepository->get($task_job);
-    }
+    $task_job = $this->tempstoreRepository->get($task_job);
 
     /** @var \Drupal\task\Entity\Task $temp_task */
     $temp_task = $this->entityTypeManager->getStorage('task')->create([

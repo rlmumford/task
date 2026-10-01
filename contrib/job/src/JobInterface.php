@@ -5,7 +5,7 @@ namespace Drupal\task_job;
 use Drupal\Component\Plugin\LazyPluginCollection;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerInterface;
-use Drupal\typed_data\Context\ContextDefinition;
+use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
 
 /**
  * Interface for Jobs.
@@ -138,7 +138,7 @@ interface JobInterface extends ConfigEntityInterface {
    * @param string $key
    *   The context key to get.
    *
-   * @return \Drupal\typed_data\Context\ContextDefinition|null
+   * @return \Drupal\Core\Plugin\Context\ContextDefinitionInterface|null
    *   Get the context definition.
    *
    * @throws \Drupal\Component\Plugin\Exception\ContextException
@@ -150,10 +150,10 @@ interface JobInterface extends ConfigEntityInterface {
    *
    * @param string $key
    *   The name of the context.
-   * @param \Drupal\typed_data\Context\ContextDefinition $context_definition
+   * @param \Drupal\Core\Plugin\Context\ContextDefinitionInterface $context_definition
    *   The definition of the context.
    */
-  public function addContextDefinition(string $key, ContextDefinition $context_definition);
+  public function addContextDefinition(string $key, ContextDefinitionInterface $context_definition);
 
   /**
    * Remove a context definition.

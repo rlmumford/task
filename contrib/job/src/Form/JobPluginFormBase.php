@@ -14,7 +14,6 @@ use Drupal\Core\Form\SubformState;
 use Drupal\Core\Plugin\PluginFormFactoryInterface;
 use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Core\Url;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\TaskJobTempstoreRepository;
 
@@ -80,10 +79,7 @@ abstract class JobPluginFormBase extends FormBase {
     $plugin_configuration = [],
   ) {
     // Get the Job from tempstore if available.
-    $job = $task_job;
-    if ($this->tempstoreRepository->has($job)) {
-      $job = $this->tempstoreRepository->get($job);
-    }
+    $job = $this->tempstoreRepository->get($task_job);
     $form_state->set('job', $job);
 
     $form['plugin_id'] = [
@@ -208,12 +204,7 @@ abstract class JobPluginFormBase extends FormBase {
 
     $form_state->set('plugin', $plugin);
 
-    $form_state->setRedirect(
-      'entity.task_job.edit_form',
-      [
-        'task_job' => $form_state->get('job')->id(),
-      ]
-    );
+    $form_state->setRedirectUrl($this->tempstoreRepository->getEditUrl($form_state->get('job')));
   }
 
   /**
@@ -224,12 +215,7 @@ abstract class JobPluginFormBase extends FormBase {
     FormStateInterface $form_state,
   ) {
     $response = new AjaxResponse();
-    $response->addCommand(new RedirectCommand(Url::fromRoute(
-      'entity.task_job.edit_form',
-      [
-        'task_job' => $form_state->get('job')->id(),
-      ]
-    )->toString()));
+    $response->addCommand(new RedirectCommand($this->tempstoreRepository->getEditUrl($form_state->get('job'))->toString()));
 
     return $response;
   }

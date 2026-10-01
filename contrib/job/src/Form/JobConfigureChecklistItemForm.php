@@ -26,13 +26,10 @@ class JobConfigureChecklistItemForm extends JobAddChecklistItemForm {
     FormStateInterface $form_state,
     ?JobInterface $task_job = NULL,
     $name = NULL,
-    $conf = []
+    $conf = [],
   ) {
     // Get the Job from tempstore if available.
-    $job = $task_job;
-    if ($this->tempstoreRepository->has($job)) {
-      $job = $this->tempstoreRepository->get($job);
-    }
+    $job = $this->tempstoreRepository->get($task_job);
     $form_state->set('job', $job);
 
     $checklist_items = $job->get('default_checklist');

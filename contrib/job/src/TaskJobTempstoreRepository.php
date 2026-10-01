@@ -2,115 +2,153 @@
 
 namespace Drupal\task_job;
 
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\TempStore\SharedTempStoreFactory;
+use Drupal\Core\Url;
+use Drupal\entity_template\BlueprintTempstoreRepository;
+use Drupal\entity_template\TemplateBlueprintProviderManager;
+use Drupal\task_job\Plugin\EntityTemplate\BlueprintProvider\BlueprintStorageJobTriggerAdaptor;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
- * Tempstore repository for jobs.
+ * One owner-protected working copy for all job configuration tabs and dialogs.
  */
 class TaskJobTempstoreRepository {
 
   /**
-   * The shared tempstore factory.
-   *
-   * @var \Drupal\Core\TempStore\SharedTempStoreFactory
+   * Constructs the repository.
    */
-  protected $tempStoreFactory;
+  public function __construct(protected SharedTempStoreFactory $tempStoreFactory, protected EntityTypeManagerInterface $entities, protected BlueprintTempstoreRepository $blueprints, protected TemplateBlueprintProviderManager $providers) {}
 
   /**
-   * TaskJobTempstoreRepository constructor.
-   *
-   * @param \Drupal\Core\TempStore\SharedTempStoreFactory $temp_store_factory
-   *   The tempstore factory.
+   * Gets the draft, folding nested Entity Template edits into the same job.
    */
-  public function __construct(SharedTempStoreFactory $temp_store_factory) {
-    $this->tempStoreFactory = $temp_store_factory;
-  }
-
-  /**
-   * Get the job.
-   *
-   * @param \Drupal\task_job\JobInterface $job
-   *   The job to look for in the tempstore.
-   *
-   * @return \Drupal\task_job\JobInterface
-   *   The job from the tempstore.
-   */
-  public function get(JobInterface $job) {
-    $key = $this->getKey($job);
-    $tempstore = $this->getTempstore($job)->get($key);
-    if (!empty($tempstore['job'])) {
-      $job = $tempstore['job'];
+  public function get(JobInterface $job): JobInterface {
+    $entry = $this->entry($job);
+    if ($entry === NULL && $job->isVersioned() && !$job->isDirty()) {
+      $dirty = $this->entities->getStorage('task_job')->load(JobVersionId::buildDirty($job->getBaseJobId(), $job->getVersion()));
+      if ($dirty instanceof JobInterface) {
+        $job = $dirty;
+        $entry = $this->entry($job);
+      }
+    }
+    if ($entry === NULL) {
+      $this->set($job);
+    }
+    $job = $entry['job'] ?? $job;
+    $configuration = $job->getTriggersConfiguration();
+    $changed = FALSE;
+    foreach ($job->getTriggerCollection() as $key => $trigger) {
+      $storage = $this->blueprintStorage($job, $trigger);
+      if ($this->blueprints->has($storage)) {
+        $original = $storage->getTemplate('default')->getConfiguration();
+        $storage = $this->blueprints->get($storage);
+        $updated = $storage->getTemplate('default')->getConfiguration();
+        if ($original !== $updated) {
+          $configuration[$key]['template'] = $updated;
+          $changed = TRUE;
+        }
+        $this->blueprints->delete($storage);
+      }
+    }
+    if ($changed) {
+      $job->set('triggers', $configuration);
+      $job->getTriggerCollection()->setConfiguration($configuration);
+      $this->set($job);
     }
     return $job;
   }
 
   /**
-   * Check if the job is in the tempstore.
-   *
-   * @param \Drupal\task_job\JobInterface $job
-   *   The job to look for.
-   *
-   * @return bool
-   *   True if its in the tempstore, false otherwise.
+   * Checks whether the current user has a working copy.
    */
-  public function has(JobInterface $job) {
-    $key = $this->getKey($job);
-    $tempstore = $this->getTempstore($job)->get($key);
-    return !empty($tempstore['job']);
+  public function has(JobInterface $job): bool {
+    return $this->entry($job) !== NULL;
   }
 
   /**
-   * Set the job in the tempstore.
-   *
-   * @param \Drupal\task_job\JobInterface $job
-   *   The job to add to the tempstore.
-   *
-   * @throws \Drupal\Core\TempStore\TempStoreException
+   * Retains the baseline and active tab while updating the draft.
    */
-  public function set(JobInterface $job) {
-    $key = $this->getKey($job);
-    $this->getTempstore($job)->set(
-      $key,
-      ['job' => $job]
-    );
+  public function set(JobInterface $job, ?string $section = NULL): void {
+    $entry = $this->entry($job);
+    $new = $entry === NULL;
+    $entry ??= [
+      'original' => $this->entities->getStorage('task_job')->loadUnchanged($job->id())?->toArray(),
+      'section' => 'checklist',
+    ];
+    $entry['job'] = $job;
+    $entry['section'] = $section ?? $entry['section'];
+    if (!$this->store()->setIfOwner($job->id(), $entry)) {
+      throw new AccessDeniedHttpException('This job is being edited by another user.');
+    }
+    if ($new) {
+      // A nested draft can outlive an expired parent. It must never be adopted
+      // by the next owner of this job's editing session.
+      foreach ($job->getTriggerCollection() as $trigger) {
+        $this->blueprints->delete($this->blueprintStorage($job, $trigger));
+      }
+    }
   }
 
   /**
-   * Delete a job from the tempstore.
-   *
-   * @param \Drupal\task_job\JobInterface $job
-   *   The job to delete from the tempstore.
+   * Checks for imports or other saves since the draft was opened.
    */
-  public function delete(JobInterface $job) {
-    $key = $this->getKey($job);
-    $this->getTempstore($job)->delete($key);
+  public function isCurrent(JobInterface $job): bool {
+    $entry = $this->entry($job);
+    $current = $this->entities->getStorage('task_job')->loadUnchanged($job->id());
+    return $entry !== NULL && array_key_exists('original', $entry) && $current?->toArray() === $entry['original'];
   }
 
   /**
-   * Get the key for the tempstore.
-   *
-   * @param \Drupal\task_job\JobInterface $job
-   *   The job.
-   *
-   * @return string
-   *   The key in the tempstore.
+   * Checks whether draft configuration differs from its saved baseline.
    */
-  protected function getKey(JobInterface $job) {
-    return $job->id();
+  public function isChanged(JobInterface $job): bool {
+    return $job->toArray() !== ($this->entry($job)['original'] ?? NULL);
   }
 
   /**
-   * Get the right tempstore.
-   *
-   * @param \Drupal\task_job\JobInterface $job
-   *   The job to get from the temstore.
-   *
-   * @return \Drupal\Core\TempStore\SharedTempStore
-   *   The tempstore.
+   * Discards every nested working copy as well as the job draft.
    */
-  protected function getTempstore(JobInterface $job) {
-    $collection = 'task_job' . $job->getEntityTypeId();
-    return $this->tempStoreFactory->get($collection);
+  public function delete(JobInterface $job): void {
+    $draft = $this->entry($job)['job'] ?? $job;
+    foreach ($draft->getTriggerCollection() as $trigger) {
+      $this->blueprints->delete($this->blueprintStorage($draft, $trigger));
+    }
+    $this->store()->deleteIfOwner($job->id());
+  }
+
+  /**
+   * Returns dialogs to the tab from which they were opened.
+   */
+  public function getEditUrl(JobInterface $job, ?string $section = NULL): Url {
+    $section ??= $this->entry($job)['section'] ?? 'checklist';
+    $route = $section === 'checklist' ? 'entity.task_job.edit_form' : 'entity.task_job.edit_' . $section;
+    return Url::fromRoute($route, ['task_job' => $job->id()]);
+  }
+
+  /**
+   * Loads metadata only for the owner; never exposes another user's draft.
+   */
+  protected function entry(JobInterface $job): ?array {
+    $entry = $this->store()->getIfOwner($job->id());
+    if ($entry === NULL && $this->store()->getMetadata($job->id())) {
+      throw new AccessDeniedHttpException('This job is being edited by another user.');
+    }
+    return $entry;
+  }
+
+  /**
+   * Gets the existing job shared-tempstore collection.
+   */
+  protected function store() {
+    return $this->tempStoreFactory->get('task_jobtask_job');
+  }
+
+  /**
+   * Creates the adapter used by nested template dialogs.
+   */
+  protected function blueprintStorage(JobInterface $job, $trigger): BlueprintStorageJobTriggerAdaptor {
+    return new BlueprintStorageJobTriggerAdaptor($job, $trigger, $this->providers->createInstance('job_trigger'));
   }
 
 }

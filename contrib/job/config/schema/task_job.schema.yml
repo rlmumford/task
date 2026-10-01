@@ -99,6 +99,15 @@ task_job.trigger:
     label:
       type: label
       label: 'The trigger description'
+    action:
+      type: mapping
+      label: 'Trigger action'
+      mapping:
+        plugin:
+          type: string
+          label: 'Action plugin'
+        configuration:
+          type: task_job.trigger_action.[%parent.plugin]
     template:
       type: entity_template.template.[id]
       label: 'Template'
@@ -112,3 +121,13 @@ task_job.trigger.manual:
   label: 'Manual Trigger Handler Settings'
 
 
+
+task_job.trigger_action.create_task:
+  type: mapping
+  label: 'Create a task'
+  mapping:
+    context_mapping:
+      type: sequence
+      label: 'Context mapping'
+      sequence:
+        type: string

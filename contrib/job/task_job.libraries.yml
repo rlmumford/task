@@ -1,0 +1,12 @@
+editor:
+  css:
+    theme:
+      css/job-editor.css: {}
+  js:
+    js/job-editor.js: {}
+  dependencies:
+    - core/drupal
+    - core/drupal.ajax
+    - core/drupal.dialog.ajax
+    - core/jquery
+    - core/once

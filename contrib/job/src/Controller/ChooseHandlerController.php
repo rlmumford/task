@@ -94,7 +94,7 @@ class ChooseHandlerController extends ControllerBase {
     ContextHandlerInterface $context_handler,
     ChecklistContextCollectorInterface $context_collector,
     ChecklistTypeManager $checklist_type_manager,
-    TaskJobTempstoreRepository $tempstore_repository
+    TaskJobTempstoreRepository $tempstore_repository,
   ) {
     $this->manager = $manager;
     $this->formBuilder = $form_builder;
@@ -114,9 +114,7 @@ class ChooseHandlerController extends ControllerBase {
    *   A build array for the page.
    */
   public function build(JobInterface $task_job) {
-    if ($this->tempstoreRepository->has($task_job)) {
-      $task_job = $this->tempstoreRepository->get($task_job);
-    }
+    $task_job = $this->tempstoreRepository->get($task_job);
 
     $definitions = $this->manager->getDefinitions();
     $definitions = $this->contextHandler->filterPluginDefinitionsByContexts(

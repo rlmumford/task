@@ -50,7 +50,8 @@ interface JobTriggerManagerInterface extends PluginManagerInterface {
    * @param array $context_values
    *   The context values.
    * @param bool $save
-   *   Whether or not to save the resulting tasks.
+   *   Whether to perform writes. FALSE previews creation without saving and
+   *   suppresses mutation actions.
    *
    * @return \Drupal\task\Entity\Task[]
    *   An array of created tasks.

@@ -14,6 +14,7 @@ use Drupal\Core\Plugin\Context\ContextAwarePluginManagerTrait;
 use Drupal\Core\Plugin\DefaultPluginManager;
 use Drupal\task_job\Annotation\JobTrigger;
 use Drupal\task_job\JobInterface;
+use Drupal\task_job\TriggerActionManager;
 
 /**
  * Manage job triggers.
@@ -65,6 +66,8 @@ class JobTriggerManager extends DefaultPluginManager implements JobTriggerManage
    *   The entity type manager.
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    *   The logger channel factory.
+   * @param \Drupal\task_job\TriggerActionManager $actions
+   *   The trigger action manager.
    */
   public function __construct(
     \Traversable $namespaces,
@@ -72,7 +75,8 @@ class JobTriggerManager extends DefaultPluginManager implements JobTriggerManage
     ModuleHandlerInterface $module_handler,
     Connection $database,
     EntityTypeManagerInterface $entity_type_manager,
-    LoggerChannelFactoryInterface $logger_factory
+    LoggerChannelFactoryInterface $logger_factory,
+    protected TriggerActionManager $actions,
   ) {
     parent::__construct(
       'Plugin/JobTrigger',
@@ -189,16 +193,12 @@ class JobTriggerManager extends DefaultPluginManager implements JobTriggerManage
     $tasks = [];
     foreach ($this->getTriggers($plugin_id) as $trigger) {
       foreach ($trigger->getContextDefinitions() as $name => $definition) {
-        if (isset($context_values[$name])) {
-          $trigger->setContextValue($name, $context_values[$name]);
-        }
+        // Cached trigger instances must not retain a previous event's values.
+        $trigger->setContextValue($name, $context_values[$name] ?? NULL);
       }
 
-      if ($trigger->access() && ($task = $trigger->createTask())) {
-        $tasks[] = $task;
-        if ($save) {
-          $task->save();
-        }
+      if ($trigger->access()) {
+        array_push($tasks, ...$this->actions->execute($trigger, $save));
       }
     }
 

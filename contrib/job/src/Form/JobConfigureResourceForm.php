@@ -28,13 +28,10 @@ class JobConfigureResourceForm extends JobAddResourceForm {
     FormStateInterface $form_state,
     ?JobInterface $task_job = NULL,
     $uuid = NULL,
-    $plugin_configuration = []
+    $plugin_configuration = [],
   ) {
     // Get the Job from tempstore if available.
-    $job = $task_job;
-    if ($this->tempstoreRepository->has($job)) {
-      $job = $this->tempstoreRepository->get($job);
-    }
+    $job = $this->tempstoreRepository->get($task_job);
     $form_state->set('job', $job);
 
     $resources = $job->getResourcesCollection()->getConfiguration();

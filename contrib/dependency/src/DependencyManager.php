@@ -205,9 +205,11 @@ class DependencyManager {
    *
    * The replacement workflow decides which subscriptions move. No per-record
    * opt-in or status inference is used. An empty selection moves nothing.
-   * Terminal owners retain their result.
+   * Terminal owners retain their result. When $unmet_only is TRUE, a receipt
+   * recorded since the caller selected dependencies is retained. This check
+   * happens under the same locks as event matching.
    */
-  public function retarget(EntityInterface $old, EntityInterface $replacement, array $dependency_ids): int {
+  public function retarget(EntityInterface $old, EntityInterface $replacement, array $dependency_ids, bool $unmet_only = FALSE): int {
     $transaction = $this->database->startTransaction();
     try {
       $this->workflow->lockTargets([['entity_type' => 'task_dependency_graph', 'entity_id' => 'graph']]);
@@ -221,6 +223,9 @@ class DependencyManager {
         throw new \InvalidArgumentException('A selected dependency no longer exists.');
       }
       foreach ($dependencies as $dependency) {
+        if ($unmet_only && $dependency->get('met')->value) {
+          continue;
+        }
         $binding = $dependency->get('bindings')->first();
         if ($binding->entity_type !== $old->getEntityTypeId() || (string) $binding->entity_id !== (string) $old->id() || $binding->entity_uuid !== $old->uuid()) {
           throw new \InvalidArgumentException('A selected dependency does not reference the original entity.');

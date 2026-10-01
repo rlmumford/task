@@ -2,6 +2,10 @@
 
 namespace Drupal\Tests\task\Kernel;
 
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Drupal\Core\Session\AnonymousUserSession;
+use Drupal\Component\Plugin\Exception\ContextException;
+use Drupal\task_dependency\Event\EntityReplacementEvent;
 use Drupal\Core\Form\FormState;
 use Drupal\entity_test\Entity\EntityTest;
 use Drupal\task\Entity\Task;
@@ -83,6 +87,110 @@ class TaskDependencyIntegrationTest extends TaskDependencyTest {
     $document->set('name', 'approved')->save();
     $this->drain();
     $this->assertSame('active', $this->fresh($task)->status->value);
+  }
+
+  /**
+   * Replacement actions move only outstanding work belonging to their job.
+   */
+  public function testReplacementAction(): void {
+    $job = Job::create([
+      'id' => 'follow_replacement',
+      'label' => 'Follow replacement',
+      'triggers' => [
+        'replaced' => [
+          'id' => 'entity.replaced:entity_test',
+          'key' => 'replaced',
+          'action' => [
+            'plugin' => 'retarget_dependencies',
+            'configuration' => [
+              'dependency_trigger' => 'entity.state:entity_test',
+              'dependency_action' => 'activate',
+              'context_mapping' => [
+                'original' => 'original',
+                'replacement' => 'replacement',
+              ],
+            ],
+          ],
+          'template' => ['id' => 'default', 'uuid' => 'replacement', 'components' => []],
+        ],
+      ],
+    ]);
+    $job->save();
+    $other_job = Job::create(['id' => 'other_job', 'label' => 'Other job']);
+    $other_job->save();
+    $original = EntityTest::create(['name' => 'draft']);
+    $original->save();
+    $replacement = EntityTest::create(['name' => 'draft']);
+    $replacement->save();
+    $manager = $this->container->get('task_dependency.manager');
+    $tasks = [];
+    foreach (['move', 'other', 'matched', 'terminal', 'invalidate'] as $name) {
+      $task = Task::create(['title' => $name, 'job' => $name === 'other' ? $other_job : $job]);
+      $dependency = $manager->create($task, 'entity.state:entity_test', [
+        'field' => 'name',
+        'value' => 'approved',
+      ], $name === 'invalidate' ? 'invalidate' : 'activate', $original);
+      $task->event_dependencies[] = ['entity' => $dependency];
+      $task->save();
+      if ($name === 'matched') {
+        $dependency->set('met', TRUE)->save();
+      }
+      if ($name === 'terminal') {
+        $task->resolve()->save();
+      }
+      $tasks[$name] = $task;
+    }
+    $triggers = $this->container->get('plugin.manager.task_job.trigger');
+    $contexts = ['original' => $original, 'replacement' => $replacement];
+    $this->assertSame([], $triggers->handleTrigger('entity.replaced:entity_test', $contexts, FALSE));
+    $this->assertSame($original->uuid(), $this->fresh($tasks['move'])->event_dependencies->entity->bindings->first()->entity_uuid);
+    try {
+      $triggers->handleTrigger('entity.replaced:entity_test', ['original' => $original]);
+      $this->fail('A replacement must not reuse the preceding event context.');
+    }
+    catch (ContextException $exception) {
+      $this->assertNotEmpty($exception->getMessage());
+    }
+    $account = $this->container->get('current_user')->getAccount();
+    $this->container->get('current_user')->setAccount(new AnonymousUserSession());
+    try {
+      $triggers->handleTrigger('entity.replaced:entity_test', $contexts);
+      $this->fail('A replacement must respect task update access.');
+    }
+    catch (AccessDeniedHttpException $exception) {
+      $this->assertNotEmpty($exception->getMessage());
+    }
+    finally {
+      $this->container->get('current_user')->setAccount($account);
+    }
+    $this->assertSame($original->uuid(), $this->fresh($tasks['move'])->event_dependencies->entity->bindings->first()->entity_uuid);
+    $this->assertContains('task_dependency_job', $job->getDependencies()['module']);
+    $database = $this->container->get('database');
+    $before = $database->select('task_dependency_history')->countQuery()->execute()->fetchField();
+    $transaction = $database->startTransaction();
+    $triggers->handleTrigger('entity.replaced:entity_test', $contexts);
+    $transaction->rollBack();
+    unset($transaction);
+    $this->container->get('entity_type.manager')->getStorage('task_dependency')->resetCache();
+    $this->assertSame($before, $database->select('task_dependency_history')->countQuery()->execute()->fetchField());
+    $this->assertSame($original->uuid(), $this->fresh($tasks['move'])->event_dependencies->entity->bindings->first()->entity_uuid);
+    $event = new EntityReplacementEvent($original, $replacement);
+    $this->container->get('event_dispatcher')->dispatch($event);
+    foreach ($tasks as $name => $task) {
+      $expected = $name === 'move' ? $replacement : $original;
+      $this->assertSame($expected->uuid(), $this->fresh($task)->event_dependencies->entity->bindings->first()->entity_uuid, $name);
+    }
+    $after = $database->select('task_dependency_history')->countQuery()->execute()->fetchField();
+    $this->assertSame((int) $before + 1, (int) $after);
+    $this->container->get('event_dispatcher')->dispatch($event);
+    $this->assertSame($after, $database->select('task_dependency_history')->countQuery()->execute()->fetchField());
+    $original->set('name', 'approved')->save();
+    $this->drain();
+    $this->assertSame('waiting', $this->fresh($tasks['move'])->status->value);
+    $replacement->set('name', 'approved')->save();
+    $this->drain();
+    $this->assertSame('active', $this->fresh($tasks['move'])->status->value);
+    $this->assertCount(5, $this->container->get('entity_type.manager')->getStorage('task')->loadMultiple());
   }
 
   /**

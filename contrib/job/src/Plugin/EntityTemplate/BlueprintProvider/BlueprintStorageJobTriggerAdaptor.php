@@ -28,11 +28,18 @@ class BlueprintStorageJobTriggerAdaptor extends BlueprintJobTriggerAdaptor imple
   public function __construct(
     JobInterface $job,
     JobTriggerInterface $trigger,
-    BlueprintProviderInterface $provider
+    BlueprintProviderInterface $provider,
   ) {
     $this->provider = $provider;
 
     parent::__construct($job, $trigger);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getEntity() {
+    return $this->getJob();
   }
 
   /**

@@ -1,0 +1,28 @@
+.task-job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: center;
+  margin: 0 0 1rem;
+}
+.task-job-actions .button {
+  margin: 0;
+}
+.task-job-draft-notice {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-inline-start: 4px solid #0678be;
+  background: #f0f6fa;
+}
+.task-job-editor h2 {
+  margin: 1.5rem 0;
+}
+.task-job-editor table {
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .task-job-editor table {
+    display: block;
+    overflow-x: auto;
+  }
+}

@@ -103,3 +103,47 @@ task_job.task_board.task.add_form:
     _title: 'Add Task'
   requirements:
     _entity_create_access: 'task'
+
+entity.task_job.edit_triggers:
+  path: '/admin/config/task/job/{task_job}/edit/triggers'
+  defaults:
+    _entity_form: 'task_job.default'
+    _title: 'Edit job'
+    _job_section: 'triggers'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE
+
+entity.task_job.edit_contexts:
+  path: '/admin/config/task/job/{task_job}/edit/contexts'
+  defaults:
+    _entity_form: 'task_job.default'
+    _title: 'Edit job'
+    _job_section: 'contexts'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE
+
+entity.task_job.edit_assignment:
+  path: '/admin/config/task/job/{task_job}/edit/assignment'
+  defaults:
+    _entity_form: 'task_job.default'
+    _title: 'Edit job'
+    _job_section: 'assignment'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE
+
+entity.task_job.edit_settings:
+  path: '/admin/config/task/job/{task_job}/edit/settings'
+  defaults:
+    _entity_form: 'task_job.default'
+    _title: 'Edit job'
+    _job_section: 'settings'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE

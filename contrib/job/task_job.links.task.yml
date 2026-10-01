@@ -1,0 +1,40 @@
+entity.task_job.edit_form:
+  title: 'Checklist'
+  route_name: entity.task_job.edit_form
+  base_route: entity.task_job.edit_form
+  weight: 0
+  options:
+    attributes:
+      data-task-job-section: 'checklist'
+entity.task_job.edit_triggers:
+  title: 'Triggers'
+  route_name: entity.task_job.edit_triggers
+  base_route: entity.task_job.edit_form
+  weight: 1
+  options:
+    attributes:
+      data-task-job-section: 'triggers'
+entity.task_job.edit_contexts:
+  title: 'Contexts'
+  route_name: entity.task_job.edit_contexts
+  base_route: entity.task_job.edit_form
+  weight: 2
+  options:
+    attributes:
+      data-task-job-section: 'contexts'
+entity.task_job.edit_assignment:
+  title: 'Assignment rules'
+  route_name: entity.task_job.edit_assignment
+  base_route: entity.task_job.edit_form
+  weight: 3
+  options:
+    attributes:
+      data-task-job-section: 'assignment'
+entity.task_job.edit_settings:
+  title: 'Settings'
+  route_name: entity.task_job.edit_settings
+  base_route: entity.task_job.edit_form
+  weight: 4
+  options:
+    attributes:
+      data-task-job-section: 'settings'

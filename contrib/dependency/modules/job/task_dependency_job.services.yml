@@ -1,0 +1,6 @@
+services:
+  task_dependency_job.replacement_subscriber:
+    class: Drupal\task_dependency_job\EventSubscriber\ReplacementSubscriber
+    arguments: ['@plugin.manager.task_job.trigger']
+    tags:
+      - { name: event_subscriber }

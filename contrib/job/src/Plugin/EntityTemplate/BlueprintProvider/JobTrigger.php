@@ -85,7 +85,7 @@ class JobTrigger extends PluginBase implements BlueprintProviderInterface, Conta
     $plugin_definition,
     JobTriggerManager $job_trigger_manager,
     EntityTypeManagerInterface $entity_type_manager,
-    TaskJobTempstoreRepository $job_tempstore_repository
+    TaskJobTempstoreRepository $job_tempstore_repository,
   ) {
     $this->jobTriggerManager = $job_trigger_manager;
     $this->jobTempstoreRepository = $job_tempstore_repository;
@@ -120,7 +120,7 @@ class JobTrigger extends PluginBase implements BlueprintProviderInterface, Conta
   public function getAvailableBlueprints(
     BuilderInterface $builder,
     $parameters = [],
-    ?AccountInterface $account = NULL
+    ?AccountInterface $account = NULL,
   ) {
     if (!($builder instanceof JobTaskBuilder) || !isset($parameters['trigger'])) {
       return $this->getAllBlueprints($builder);
@@ -192,12 +192,7 @@ class JobTrigger extends PluginBase implements BlueprintProviderInterface, Conta
       throw new \Exception('Invalid blueprint storage provided.');
     }
 
-    return new Url(
-      'entity.task_job.edit_form',
-      [
-        'task_job' => $blueprint_storage->getJob()->id(),
-      ]
-    );
+    return $this->jobTempstoreRepository->getEditUrl($blueprint_storage->getJob());
   }
 
   /**
@@ -208,12 +203,7 @@ class JobTrigger extends PluginBase implements BlueprintProviderInterface, Conta
       throw new \Exception('Invalid blueprint storage provided.');
     }
 
-    return new Url(
-      'entity.task_job.edit_form',
-      [
-        'task_job' => $blueprint_storage->getJob()->id(),
-      ]
-    );
+    return $this->jobTempstoreRepository->getEditUrl($blueprint_storage->getJob());
   }
 
 }

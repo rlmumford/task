@@ -13,7 +13,7 @@ services:
       - { name: event_subscriber }
   task_job.tempstore_repository:
     class: Drupal\task_job\TaskJobTempstoreRepository
-    arguments: ['@tempstore.shared']
+    arguments: ['@tempstore.shared', '@entity_type.manager', '@entity_template.blueprint_tempstore_repository', '@plugin.manager.entity_template.blueprint_provider']
   task_job.collect_resources_subscriber:
     class: Drupal\task_job\EventSubscriber\CollectResourcesSubscriber
     arguments: ['@task.resource_manager']
@@ -21,4 +21,7 @@ services:
       - { name: event_subscriber }
   plugin.manager.task_job.trigger:
     class: Drupal\task_job\Plugin\JobTrigger\JobTriggerManager
-    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@database', '@entity_type.manager', '@logger.factory']
+    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@database', '@entity_type.manager', '@logger.factory', '@plugin.manager.task_job.trigger_action']
+  plugin.manager.task_job.trigger_action:
+    class: Drupal\task_job\TriggerActionManager
+    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@context.handler']
