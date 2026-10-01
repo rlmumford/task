@@ -169,3 +169,22 @@ entity.task_job.edit_template:
     _entity_access: 'task_job.update'
   options:
     _admin_route: TRUE
+
+task_job.assignment.add:
+  path: '/admin/config/task/job/{task_job}/assignment/add'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobAssignmentRuleForm'
+    _title: 'Add assignment rule'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE
+task_job.assignment.configure:
+  path: '/admin/config/task/job/{task_job}/assignment/{rule}/configure'
+  defaults:
+    _form: '\Drupal\task_job\Form\JobAssignmentRuleForm'
+    _title: 'Configure assignment rule'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE

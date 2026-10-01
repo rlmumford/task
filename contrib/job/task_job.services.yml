@@ -9,6 +9,7 @@ services:
     arguments: ['@entity_type.manager']
   task_job.assignment_subscriber:
     class: Drupal\task_job\EventSubscriber\AssignmentSubscriber
+    arguments: ['@task_job.version_resolver', '@task_job.assignment_rules']
     tags:
       - { name: event_subscriber }
   task_job.tempstore_repository:
@@ -28,3 +29,6 @@ services:
   task_job.template_local_tasks:
     class: Drupal\task_job\JobTemplateLocalTasks
     arguments: ['@task_job.tempstore_repository', '@current_route_match']
+  task_job.assignment_rules:
+    class: Drupal\task_job\AssignmentRules
+    arguments: ['@checklist.condition_evaluator', '@context.handler']

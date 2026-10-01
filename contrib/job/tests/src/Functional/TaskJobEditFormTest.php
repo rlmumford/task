@@ -254,4 +254,50 @@ class TaskJobEditFormTest extends BrowserTestBase {
 
   }
 
+  /**
+   * Rule dialogs, order and removal stay in the shared draft until Save.
+   */
+  public function testAssignmentRuleEditor(): void {
+    $this->drupalGet('/admin/config/task/job/follow_up/edit/assignment');
+    $this->submitForm([], 'Apply to draft');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->clickLink('Add assignment rule');
+    $this->assertSession()->elementAttributeContains('css', '[name="context_mapping[assignee]"]', 'data-autocomplete-path', 'typed_data_context_assignment_autocomplete');
+    $this->submitForm([
+      'label' => 'Urgent creator',
+      'context_mapping[assignee]' => 'task.creator.0.entity',
+      'condition[id]' => 'condition_string',
+    ], 'Update condition');
+    $this->assertSession()->fieldNotExists('condition[settings][context_mapping][task]');
+    $this->submitForm(['condition[settings][condition_string]' => 'task.title.value == "Urgent"'], 'Add rule');
+    $this->assertSession()->addressEquals('/admin/config/task/job/follow_up/edit/assignment');
+    $this->assertSession()->pageTextContains('Urgent creator');
+    $this->assertEmpty($this->saved()->get('assignment_rules'));
+    $this->clickLink('Contexts');
+    $this->clickLink('Assignment rules');
+    $this->clickLink('Configure');
+    $this->assertSession()->fieldValueEquals('condition[settings][condition_string]', 'task.title.value == "Urgent"');
+    $this->submitForm(['label' => 'Urgent work'], 'Update rule');
+    $this->clickLink('Add assignment rule');
+    $this->submitForm(['label' => 'Other work', 'context_mapping[assignee]' => 'task.creator.0.entity'], 'Add rule');
+    $this->submitForm([], 'Save');
+    $rules = $this->saved()->get('assignment_rules');
+    $keys = array_keys($rules);
+    $this->assertSame(['Urgent work', 'Other work'], array_column($rules, 'label'));
+    $this->switchTab([
+      'assignment_rules[' . $keys[0] . '][weight]' => 2,
+      'assignment_rules[' . $keys[1] . '][weight]' => 0,
+    ], 'Settings');
+    $this->clickLink('Assignment rules');
+    $this->submitForm([], 'Save');
+    $this->assertSame(['Other work', 'Urgent work'], array_column($this->saved()->get('assignment_rules'), 'label'));
+    $this->submitForm([], 'Remove');
+    $this->assertSession()->pageTextNotContains('Other work');
+    $this->submitForm([], 'Discard changes');
+    $this->assertSession()->pageTextContains('Other work');
+    $this->submitForm([], 'Remove');
+    $this->submitForm([], 'Save');
+    $this->assertSame(['Urgent work'], array_column($this->saved()->get('assignment_rules'), 'label'));
+  }
+
 }

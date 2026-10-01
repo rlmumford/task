@@ -210,6 +210,7 @@ class JobEditForm extends JobForm {
     elseif ($section === 'assignment') {
       $settings = parent::form([], $form_state);
       $form['assignment'] = $settings['assignment'];
+      $form = $this->buildAssignmentRules($form, $form_state, $ajax_attributes);
     }
     else {
       $method = [
@@ -221,6 +222,78 @@ class JobEditForm extends JobForm {
       $form = $this->$method($form, $form_state, $ajax_attributes);
     }
     return $form;
+  }
+
+  /**
+   * Lists rules in evaluation order, using the existing draft/dialog workflow.
+   */
+  protected function buildAssignmentRules(array $form, FormStateInterface $form_state, array $ajax_attributes): array {
+    $form['assignment']['#title'] = $this->t('Fallback assignment');
+    $form['assignment']['#description'] = $this->t('Used only when no assignment rule matches. Explicit task assignees are never replaced.');
+    $form['assignment_help'] = [
+      '#type' => 'html_tag',
+      '#tag' => 'p',
+      '#value' => $this->t('Rules run from top to bottom when an unassigned task is saved. The first matching rule wins. Drag rows to change their order.'),
+    ];
+    $form['add_assignment_rule'] = [
+      '#type' => 'link',
+      '#title' => $this->t('Add assignment rule'),
+      '#url' => Url::fromRoute('task_job.assignment.add', ['task_job' => $this->entity->id()], $ajax_attributes),
+      '#attributes' => ['class' => ['button']],
+    ];
+    $form['assignment_rules'] = [
+      '#type' => 'table',
+      '#header' => [$this->t('Rule'), $this->t('Assignee context'), $this->t('Operations'), $this->t('Order')],
+      '#empty' => $this->t('No assignment rules. The fallback assignment applies.'),
+      '#tabledrag' => [['action' => 'order', 'relationship' => 'sibling', 'group' => 'assignment-rule-weight']],
+    ];
+    foreach (array_keys($this->entity->get('assignment_rules') ?: []) as $weight => $key) {
+      $rule = $this->entity->get('assignment_rules')[$key];
+      $form['assignment_rules'][$key] = [
+        '#attributes' => ['class' => ['draggable']],
+        '#weight' => $weight,
+        'label' => ['#plain_text' => $rule['label']],
+        'assignee' => ['#plain_text' => $rule['context_mapping']['assignee']],
+        'operations' => [
+          '#type' => 'container',
+          '#attributes' => ['class' => ['task-job-assignment-operations']],
+          'configure' => [
+            '#type' => 'link',
+            '#title' => $this->t('Configure'),
+            '#url' => Url::fromRoute('task_job.assignment.configure', [
+              'task_job' => $this->entity->id(),
+              'rule' => $key,
+            ], $ajax_attributes),
+          ],
+          'remove' => [
+            '#type' => 'submit',
+            '#value' => $this->t('Remove'),
+            '#name' => 'remove_assignment_' . $key,
+            '#rule' => $key,
+            '#submit' => ['::submitForm', '::removeAssignmentRule'],
+          ],
+        ],
+        'weight' => [
+          '#type' => 'weight',
+          '#title' => $this->t('Order for @rule', ['@rule' => $rule['label']]),
+          '#title_display' => 'invisible',
+          '#default_value' => $weight,
+          '#delta' => max(10, count($this->entity->get('assignment_rules'))),
+          '#attributes' => ['class' => ['assignment-rule-weight']],
+        ],
+      ];
+    }
+    return $form;
+  }
+
+  /**
+   * Removes a rule from the draft only.
+   */
+  public function removeAssignmentRule(array &$form, FormStateInterface $form_state): void {
+    $rules = $this->entity->get('assignment_rules');
+    unset($rules[$form_state->getTriggeringElement()['#rule']]);
+    $this->entity->set('assignment_rules', $rules);
+    $this->saveDraft($form, $form_state);
   }
 
   /**
@@ -877,6 +950,12 @@ class JobEditForm extends JobForm {
       if (isset($form[$property]) && $form_state->hasValue($property)) {
         $entity->set($property, $form_state->getValue($property));
       }
+    }
+    if (isset($form['assignment_rules'])) {
+      $weights = $form_state->getValue('assignment_rules') ?: [];
+      uasort($weights, static fn(array $a, array $b) => $a['weight'] <=> $b['weight']);
+      $rules = $entity->get('assignment_rules') ?: [];
+      $entity->set('assignment_rules', array_replace(array_intersect_key($weights, $rules), $rules));
     }
     if (isset($form['checklist_includes'])) {
       $entity->set('checklist_includes', array_values(array_filter($form_state->getValue('checklist_includes', []))));

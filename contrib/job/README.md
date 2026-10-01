@@ -119,3 +119,73 @@ This is the static authoring foundation for P5. Repeated scoped instances,
 nested templates, conditional/decision-driven expansion, generated local names,
 and orphan reconciliation/restoration remain separate work. A template is local
 to its job; this does not introduce a site-wide template config entity.
+
+## Ordered assignment rules
+
+The **Assignment rules** tab has a sortable table and off-canvas rule editors.
+Each rule has a label, an optional native Drupal condition plugin configuration,
+and `context_mapping.assignee`. The condition editor supports condition strings,
+core conditions, TRUE/FALSE and nested AND/OR/XOR/XAnd groups. Omitting a condition
+means the rule always matches. Rules live in the same job draft and named version
+as the checklist and triggers. Add, edit, reorder and remove change the draft;
+only Save writes configuration, and Discard restores the saved job.
+
+On saving an unassigned task, evaluate rules in their stored order. The first
+matching rule wins. Resolve its assignee through the core `context.handler`
+service, extended by Typed Data Plus. Assign only an active, authenticated user.
+If the matched rule's account is missing or blocked, leave the task unassigned;
+do not run another rule or the fallback. If no rule matches, retain the existing
+`assignment` policy: service manager, task creator, or leave unassigned.
+Existing task assignments and accounts selected by higher-priority subscribers
+are preserved. Clearing an assignee allows selection again on the next save;
+editing a job does not reassign already assigned tasks.
+
+The available contexts are `task`, plus each declared job context as
+`task_context:NAME`. A simple `NAME` alias is also supplied for condition strings,
+except that `task` always means the task entity. Caller-supplied contexts are fixed
+sources, including within nested condition groups: the condition editor does not
+ask users to map them again, and stored mappings cannot redirect them. Actual
+plugin inputs (such as User Role’s user input) and the assignee use the enhanced
+Typed Data Plus autocomplete widget when context assignment is enabled, supporting
+property paths and filters. Definitions come from the edited
+job during configuration; runtime values come from that task. Global providers
+remain available through `@provider:context` mappings. For example:
+
+```yaml
+assignment: service_manager
+assignment_rules:
+  urgent_review:
+    label: Urgent work to the reviewer
+    condition:
+      id: condition_string
+      condition_string: 'task.title.value matches "/urgent/i"'
+      negate: false
+    context_mapping:
+      assignee: 'task_context:reviewer'
+  routine_work:
+    label: Other work to the creator
+    context_mapping:
+      assignee: 'task.creator.0.entity'
+```
+
+Rule keys are stable identifiers (the editor generates UUIDs); sequence order is
+evaluation order. To use the service manager directly in a rule, map to
+`task.service.entity.manager.entity`. Autocomplete suggests selectors; property paths and filters can also be entered
+directly. Current user means the
+account performing the save, including a worker's execution account, so use a
+stable task/job context when assignment must not depend on the caller.
+
+A task with `job_version` resolves that version's saved dirty overlay for both
+assignment rules and task-context definitions. Without `job_version`, the existing
+direct job-reference behavior is retained. Unsaved job-editor drafts are not used
+for live task assignment. Missing required condition inputs mean no match;
+invalid plugin configuration or invalid selectors raise an error rather than
+silently falling back to a different person. Condition plugin dependencies are
+included in the job's configuration dependencies.
+
+`AssignmentRulesTest` covers real task saves, first-match order, default fallback,
+blocked/missing accounts, explicit assignments, core conditions, groups, global
+contexts, pinned versions, dirty overrides and unsaved authoring contexts.
+`TaskJobEditFormTest::testAssignmentRuleEditor` covers the editor, shared drafts,
+reordering, removal, Save and Discard. Existing jobs need no data migration:
+`assignment_rules` defaults to an empty sequence.

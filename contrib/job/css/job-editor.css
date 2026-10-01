@@ -26,3 +26,12 @@
     overflow-x: auto;
   }
 }
+
+.task-job-assignment-operations {
+  display: flex;
+  gap: .75rem;
+  align-items: center;
+}
+.task-job-assignment-operations .button {
+  margin: 0;
+}

@@ -85,8 +85,11 @@ function task_job_typed_data_reference_property_definitions(FieldItemListInterfa
     !$entity->get('job')->isEmpty()
   ) {
     /** @var \Drupal\task_job\Entity\Job $job */
-    $job = $entity->job->entity;
-    foreach ($job->getContextDefinitions() as $key => $definition) {
+    // Configuration checklists supply a job with unsaved context definitions.
+    $job = $entity->get('job_version')->isEmpty()
+      ? $entity->job->entity
+      : \Drupal::service('task_job.version_resolver')->load($entity->job->target_id, $entity->get('job_version')->value);
+    foreach ($job?->getContextDefinitions() ?? [] as $key => $definition) {
       $definitions[$key] = $definition->getDataDefinition();
     }
   }

@@ -14,6 +14,23 @@ task_job.task_job.*:
     assignment:
       type: string
       label: 'Default assignment rule'
+    assignment_rules:
+      type: sequence
+      label: 'Ordered assignment rules'
+      sequence:
+        type: mapping
+        mapping:
+          label:
+            type: label
+            label: 'Rule label'
+          context_mapping:
+            type: sequence
+            label: 'Context mapping'
+            sequence:
+              type: string
+          condition:
+            type: condition.plugin.[id]
+            label: 'Condition'
     context:
       type: sequence
       label: 'Task Contexts'

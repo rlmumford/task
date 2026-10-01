@@ -39,6 +39,7 @@ use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
  *     "checklist_includes",
  *     "triggers",
  *     "assignment",
+ *     "assignment_rules",
  *     "version",
  *     "version_of",
  *     "dirty",
@@ -220,6 +221,13 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
    * @var string
    */
   protected $assignment = 'service_manager';
+
+  /**
+   * Ordered conditional assignments, evaluated before the default policy.
+   *
+   * @var array
+   */
+  protected $assignment_rules = [];
 
   /**
    * The triggers configuration.
@@ -494,6 +502,12 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
         foreach ($names as $name) {
           $this->addDependency($type, $name);
         }
+      }
+    }
+    $conditions = array_filter(array_column($this->get('assignment_rules') ?: [], 'condition'));
+    foreach (\Drupal::service('checklist.condition_evaluator')->calculateDependencies($conditions) as $type => $names) {
+      foreach ($names as $name) {
+        $this->addDependency($type, $name);
       }
     }
     $manager = \Drupal::service('plugin.manager.checklist_item_handler');
