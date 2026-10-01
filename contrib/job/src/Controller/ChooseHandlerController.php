@@ -16,6 +16,7 @@ use Drupal\task_job\JobConfigurationChecklist;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\TaskJobTempstoreRepository;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Controller for adding new checklist items to a job.
@@ -109,17 +110,19 @@ class ChooseHandlerController extends ControllerBase {
    *
    * @param \Drupal\task_job\JobInterface $task_job
    *   The job.
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request identifying an optional named checklist template.
    *
    * @return array
    *   A build array for the page.
    */
-  public function build(JobInterface $task_job) {
+  public function build(JobInterface $task_job, Request $request) {
     $task_job = $this->tempstoreRepository->get($task_job);
 
     $definitions = $this->manager->getDefinitions();
     $definitions = $this->contextHandler->filterPluginDefinitionsByContexts(
       $this->contextCollector->collectConfigContexts(
-        JobConfigurationChecklist::createFromJob($task_job, $this->checklistTypeManager)
+        JobConfigurationChecklist::createFromJob($task_job, $this->checklistTypeManager, $request->query->get('template'))
       ),
       $definitions
     );
@@ -159,7 +162,8 @@ class ChooseHandlerController extends ControllerBase {
             [
               'task_job' => $task_job->id(),
               'handler' => $name,
-            ]
+            ],
+            ['query' => array_filter(['template' => $request->query->get('template')])]
           ),
           'attributes' => $this->getAjaxAttributes(),
         ];

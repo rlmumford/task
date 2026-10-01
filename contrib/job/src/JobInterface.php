@@ -59,7 +59,10 @@ interface JobInterface extends ConfigEntityInterface {
   public function getActiveHash(): string;
 
   /**
-   * Get the default checklist items for this job.
+   * Gets default items or the items in one named template.
+   *
+   * @param string|null $template
+   *   The template machine name, or NULL for the default checklist.
    *
    * @return array
    *   An array of checklist item configuration keyed by the name.
@@ -68,7 +71,17 @@ interface JobInterface extends ConfigEntityInterface {
    *     - handler - The handler plugin used for the checklist item.
    *     - handler_configuration - The configuration to be passed to the plugin.
    */
-  public function getChecklistItems() : array;
+  public function getChecklistItems(?string $template = NULL): array;
+
+  /**
+   * Updates a checklist definition without saving the job.
+   */
+  public function setChecklistItems(array $items, ?string $template = NULL): void;
+
+  /**
+   * Assembles static inclusions, rejecting missing templates and collisions.
+   */
+  public function getExpandedChecklistItems(): array;
 
   /**
    * Get the resources to be displayed on task of this job.

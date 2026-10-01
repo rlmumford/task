@@ -23,16 +23,31 @@ class JobConfigurationChecklist extends Checklist {
    *   The job.
    * @param \Drupal\Component\Plugin\PluginManagerInterface|null $checklist_type_manager
    *   The checklist type manager.
+   * @param string|null $template
+   *   Include this template when collecting definitions during authoring.
    *
    * @return static
    *   A constructed checklist object.
    *
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    */
-  public static function createFromJob(JobInterface $job, ?PluginManagerInterface $checklist_type_manager = NULL) {
+  public static function createFromJob(JobInterface $job, ?PluginManagerInterface $checklist_type_manager = NULL, ?string $template = NULL) {
     if (!$checklist_type_manager) {
       $checklist_type_manager = \Drupal::service('plugin.manager.checklist_type');
     }
+
+    $job = clone $job;
+    $items = $job->getChecklistItems();
+    $templates = $job->get('checklist_templates') ?: [];
+    foreach ($job->get('checklist_includes') ?: [] as $include) {
+      // Keep the editor usable while references or names are being repaired.
+      $items += $templates[$include]['items'] ?? [];
+    }
+    if ($template !== NULL) {
+      $items = $job->getChecklistItems($template) + $items;
+    }
+    $job->setChecklistItems($items);
+    $job->set('checklist_includes', []);
 
     return new static(
       $checklist_type_manager->createInstance('job', ['job' => $job])
@@ -46,7 +61,7 @@ class JobConfigurationChecklist extends Checklist {
    *   The checklist type plugin.
    */
   public function __construct(
-    ChecklistTypeInterface $type
+    ChecklistTypeInterface $type,
   ) {
     if (!($type instanceof Job)) {
       throw new \InvalidArgumentException('Only job configuration types are compatible with ' . static::class);

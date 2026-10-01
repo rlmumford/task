@@ -42,23 +42,28 @@ task_job.task_job.*:
         type: block.settings.[id]
     default_checklist:
       type: sequence
-      label: 'Default chacklist'
+      label: 'Default checklist'
       sequence:
-        - type: mapping
-          label: 'Checklist Item'
-          mapping:
-            name:
-              type: string
-              label: 'The short name or key'
-            label:
-              type: label
-              label: 'The label of the item'
-            handler:
-              type: string
-              label: 'The handler plugin id.'
-            handler_configuration:
-              type: checklist_item_handler.[%parent.handler]
-              label: 'The handler configuration.'
+        type: task_job.checklist_item
+    checklist_templates:
+      type: sequence
+      label: 'Named checklist templates'
+      sequence:
+        type: mapping
+        mapping:
+          label:
+            type: label
+            label: 'Template label'
+          items:
+            type: sequence
+            label: 'Checklist items'
+            sequence:
+              type: task_job.checklist_item
+    checklist_includes:
+      type: sequence
+      label: 'Statically included checklist templates'
+      sequence:
+        type: string
     version:
       type: string
       label: 'Named job version'
@@ -131,3 +136,21 @@ task_job.trigger_action.create_task:
       label: 'Context mapping'
       sequence:
         type: string
+
+
+task_job.checklist_item:
+  type: mapping
+  label: 'Checklist item'
+  mapping:
+    name:
+      type: string
+      label: 'The short name or key'
+    label:
+      type: label
+      label: 'The label of the item'
+    handler:
+      type: string
+      label: 'The handler plugin id'
+    handler_configuration:
+      type: checklist_item_handler.[%parent.handler]
+      label: 'The handler configuration'

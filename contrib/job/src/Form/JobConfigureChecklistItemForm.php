@@ -32,7 +32,7 @@ class JobConfigureChecklistItemForm extends JobAddChecklistItemForm {
     $job = $this->tempstoreRepository->get($task_job);
     $form_state->set('job', $job);
 
-    $checklist_items = $job->get('default_checklist');
+    $checklist_items = $job->getChecklistItems($this->getRequest()->query->get('template'));
     if (!isset($checklist_items[$name])) {
       throw new NotFoundHttpException();
     }

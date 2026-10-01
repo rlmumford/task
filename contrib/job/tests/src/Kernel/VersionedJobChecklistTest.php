@@ -5,6 +5,7 @@ namespace Drupal\Tests\task_job\Kernel;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\Entity\Job;
+use Drupal\task_job\JobConfigurationChecklist;
 
 /**
  * Tests task checklist resolution across clean and dirty job versions.
@@ -97,6 +98,125 @@ class VersionedJobChecklistTest extends KernelTestBase {
 
     $task = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id());
     $this->assertSame('Version 6 dirty review', $task->checklist->checklist->getItem('review')->get('title')->value);
+  }
+
+  /**
+   * Static template items follow version resolution without losing stored work.
+   */
+  public function testNamedChecklistTemplates(): void {
+    $job = Job::create([
+      'id' => 'templates',
+      'label' => 'Template job',
+      'checklist_templates' => [
+        'appointment' => [
+          'label' => 'Appointment preparation',
+          'items' => [
+            'confirm' => [
+              'name' => 'confirm',
+              'label' => 'Confirm appointment',
+              'handler' => 'simply_checkable',
+              'handler_configuration' => [],
+            ],
+          ],
+        ],
+      ],
+      'checklist_includes' => ['appointment'],
+    ]);
+    $job->save();
+    $resolver = $this->container->get('task_job.version_resolver');
+    $six = $resolver->createVersion($job, '6');
+    $six->save();
+    $task = Task::create(['title' => 'Preparation', 'job' => $job, 'job_version' => '6']);
+    $task->save();
+    $storage = $this->container->get('entity_type.manager')->getStorage('task');
+    $this->assertSame(['confirm'], array_keys($task->checklist->checklist->getItems()));
+    $this->assertSame('Confirm appointment', $task->checklist->checklist->getItem('confirm')->get('title')->value);
+    $seven = $resolver->createVersion($job, '7');
+    $items = $seven->getChecklistItems('appointment');
+    $items['confirm']['label'] = 'Version seven';
+    $seven->setChecklistItems($items, 'appointment');
+    $seven->save();
+    $task = $storage->loadUnchanged($task->id());
+    $this->assertSame('Confirm appointment', $task->checklist->checklist->getItem('confirm')->get('title')->value);
+    $dirty = $resolver->createDirtyVersion($six);
+    $items['confirm']['label'] = 'Saved version six fix';
+    $dirty->setChecklistItems($items, 'appointment');
+    $dirty->save();
+    $task = $storage->loadUnchanged($task->id());
+    $item = $task->checklist->checklist->getItem('confirm');
+    $this->assertSame('Saved version six fix', $item->get('title')->value);
+    $item->setComplete();
+    $item->save();
+    $id = $item->id();
+    $task = $storage->loadUnchanged($task->id());
+    $this->assertSame(['confirm'], array_keys($task->checklist->checklist->getItems()));
+    $this->assertSame($id, $task->checklist->checklist->getItem('confirm')->id());
+    $this->assertTrue($task->checklist->checklist->getItem('confirm')->isComplete());
+    $dirty->set('checklist_includes', []);
+    $dirty->save();
+    $task = $storage->loadUnchanged($task->id());
+    $this->assertSame($id, $task->checklist->checklist->getItem('confirm')->id());
+    $this->assertTrue($task->checklist->checklist->getItem('confirm')->isComplete());
+    $this->assertSame(['confirm'], array_keys($six->getExpandedChecklistItems()));
+    $this->assertContains('checklist', $job->getDependencies()['module']);
+    // Missing references and collisions cannot become an empty complete list.
+    $job->set('checklist_includes', ['missing']);
+    try {
+      $job->getExpandedChecklistItems();
+      $this->fail('Missing templates must fail explicitly.');
+    }
+    catch (\InvalidArgumentException $exception) {
+      $this->assertStringContainsString('missing', $exception->getMessage());
+    }
+    $invalid = $this->container->get('plugin.manager.checklist_type')->createInstance('job', ['job' => $job]);
+    $checklist = $invalid->getChecklist(Task::create(['title' => 'Invalid configuration']), 'checklist');
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+      try {
+        $checklist->getItems();
+        $this->fail('A failed expansion must not cache an empty checklist.');
+      }
+      catch (\InvalidArgumentException $exception) {
+        $this->assertStringContainsString('missing', $exception->getMessage());
+      }
+    }
+    $job->set('checklist_includes', ['appointment']);
+    $job->setChecklistItems($job->getChecklistItems('appointment'));
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('occurs more than once');
+    $job->getExpandedChecklistItems();
+  }
+
+  /**
+   * Template outcomes are available to later item configuration.
+   */
+  public function testTemplateOutcomeContexts(): void {
+    $job = Job::create([
+      'id' => 'outcome_templates',
+      'label' => 'Template outcomes',
+      'checklist_templates' => [
+        'review' => [
+          'label' => 'Review',
+          'items' => [
+            'decision' => [
+              'label' => 'Approve the document',
+              'handler' => 'decision',
+              'handler_configuration' => [
+                'options' => ['approve' => ['label' => 'Approve']],
+              ],
+            ],
+          ],
+        ],
+      ],
+    ]);
+    $collector = $this->container->get('checklist.context_collector');
+    $contexts = $collector->collectConfigContexts(JobConfigurationChecklist::createFromJob($job));
+    $this->assertArrayNotHasKey('item:decision:decision', $contexts);
+    $contexts = $collector->collectConfigContexts(JobConfigurationChecklist::createFromJob($job, NULL, 'review'));
+    $this->assertSame('string', $contexts['item:decision:decision']->getContextDefinition()->getDataType());
+    $job->set('checklist_includes', ['review']);
+    $contexts = $collector->collectConfigContexts(JobConfigurationChecklist::createFromJob($job));
+    $this->assertArrayHasKey('item:decision:decision', $contexts);
+    $this->assertArrayHasKey('item:decision:reason', $contexts);
   }
 
 }

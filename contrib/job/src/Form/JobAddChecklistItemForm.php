@@ -28,6 +28,11 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
   protected ConditionConfigurationForm $conditions;
 
   /**
+   * Named template being edited, or NULL for the default checklist.
+   */
+  protected ?string $checklistTemplate = NULL;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
@@ -71,6 +76,8 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
     $handler = NULL,
     $handler_config = [],
   ) {
+    $this->checklistTemplate = $form_state->get('checklist_template') ?? $this->getRequest()->query->get('template');
+    $form_state->set('checklist_template', $this->checklistTemplate);
     $form = parent::buildForm(
       $form,
       $form_state,
@@ -90,7 +97,7 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
     ];
     if ($default_prefix = $this->config('task_checklist.defaults')->get('ci_name_prefix')) {
       $form['name']['#default_value'] = $default_prefix . str_pad(
-          count($form_state->get('job')->getChecklistItems()) + 1,
+          count($form_state->get('job')->getChecklistItems($form_state->get('checklist_template'))) + 1,
           2,
           '0',
           STR_PAD_LEFT
@@ -136,7 +143,7 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
       return;
     }
     $name = $form_state->getValue('name');
-    if (!preg_match('/^[a-z][a-z0-9_]*$/D', $name) || (empty($form['name']['#disabled']) && isset($form_state->get('job')->getChecklistItems()[$name]))) {
+    if (!preg_match('/^[a-z][a-z0-9_]*$/D', $name) || (empty($form['name']['#disabled']) && isset($form_state->get('job')->getChecklistItems($form_state->get('checklist_template'))[$name]))) {
       $form_state->setError($form['name'], $this->t('Use a unique machine name starting with a lowercase letter, followed by lowercase letters, digits or underscores.'));
     }
     $gates = [];
@@ -161,14 +168,14 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
     $configuration['conditions'] = $form_state->get('checklist_conditions');
     $plugin->setConfiguration($configuration);
     $job = $form_state->get('job');
-    $checklist_items = $job->get('default_checklist');
+    $checklist_items = $job->getChecklistItems($form_state->get('checklist_template'));
     $checklist_items[$form_state->getValue('name')] = [
       'name' => $form_state->getValue('name'),
       'label' => $form_state->getValue('label'),
       'handler' => $plugin->getPluginId(),
       'handler_configuration' => $plugin->getConfiguration(),
     ];
-    $job->set('default_checklist', $checklist_items);
+    $job->setChecklistItems($checklist_items, $form_state->get('checklist_template'));
 
     $this->tempstoreRepository->set($job);
   }
@@ -183,7 +190,7 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
    *   A list of contexts available to the plugin.
    */
   protected function gatherContexts(JobInterface $task_job) {
-    return $this->contextCollector->collectConfigContexts(JobConfigurationChecklist::createFromJob($task_job));
+    return $this->contextCollector->collectConfigContexts(JobConfigurationChecklist::createFromJob($task_job, NULL, $this->checklistTemplate));
   }
 
 }

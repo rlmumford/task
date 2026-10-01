@@ -35,6 +35,8 @@ use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
  *     "description",
  *     "resources",
  *     "default_checklist",
+ *     "checklist_templates",
+ *     "checklist_includes",
  *     "triggers",
  *     "assignment",
  *     "version",
@@ -255,6 +257,20 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
    * @codingStandardsIgnoreStart
    */
   protected $default_checklist = [];
+
+  /**
+   * Named checklist definitions belonging to this job version.
+   *
+   * @var array
+   */
+  protected $checklist_templates = [];
+
+  /**
+   * Templates statically included in the default checklist.
+   *
+   * @var string[]
+   */
+  protected $checklist_includes = [];
   // @codingStandardsIgnoreEnd
 
   /**
@@ -282,8 +298,50 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
    *     - handler - The handler plugin used for the checklist item.
    *     - handler_configuration - The configuration to be passed to the plugin.
    */
-  public function getChecklistItems(): array {
-    return $this->get('default_checklist') ?: [];
+  public function getChecklistItems(?string $template = NULL): array {
+    if ($template === NULL) {
+      return $this->get('default_checklist') ?: [];
+    }
+    $templates = $this->get('checklist_templates') ?: [];
+    if (!isset($templates[$template])) {
+      throw new \InvalidArgumentException(sprintf('Checklist template "%s" does not exist.', $template));
+    }
+    return $templates[$template]['items'] ?? [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setChecklistItems(array $items, ?string $template = NULL): void {
+    if ($template === NULL) {
+      $this->set('default_checklist', $items);
+      return;
+    }
+    $this->getChecklistItems($template);
+    $templates = $this->get('checklist_templates');
+    $templates[$template]['items'] = $items;
+    $this->set('checklist_templates', $templates);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getExpandedChecklistItems(): array {
+    $items = $this->getChecklistItems();
+    $seen = [];
+    foreach ($this->get('checklist_includes') ?: [] as $template) {
+      if (isset($seen[$template])) {
+        throw new \InvalidArgumentException(sprintf('Checklist template "%s" is included more than once.', $template));
+      }
+      $seen[$template] = TRUE;
+      foreach ($this->getChecklistItems($template) as $name => $item) {
+        if (isset($items[$name])) {
+          throw new \InvalidArgumentException(sprintf('Checklist item "%s" occurs more than once after including template "%s".', $name, $template));
+        }
+        $items[$name] = $item;
+      }
+    }
+    return $items;
   }
 
   /**
@@ -439,7 +497,11 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
       }
     }
     $manager = \Drupal::service('plugin.manager.checklist_item_handler');
-    foreach ($this->getChecklistItems() as $item) {
+    $definitions = array_values($this->getChecklistItems());
+    foreach ($this->get('checklist_templates') ?: [] as $template) {
+      $definitions = array_merge($definitions, array_values($template['items'] ?? []));
+    }
+    foreach ($definitions as $item) {
       $handler = $manager->createInstance($item['handler'], $item['handler_configuration']);
       $dependencies = $handler instanceof DependentPluginInterface ? $handler->calculateDependencies() : [];
       $dependencies['module'][] = $handler->getPluginDefinition()['provider'];

@@ -69,7 +69,7 @@ class TaskJobTempstoreRepository {
   /**
    * Retains the baseline and active tab while updating the draft.
    */
-  public function set(JobInterface $job, ?string $section = NULL): void {
+  public function set(JobInterface $job, ?string $section = NULL, ?string $template = NULL): void {
     $entry = $this->entry($job);
     $new = $entry === NULL;
     $entry ??= [
@@ -78,6 +78,9 @@ class TaskJobTempstoreRepository {
     ];
     $entry['job'] = $job;
     $entry['section'] = $section ?? $entry['section'];
+    if ($section === 'templates') {
+      $entry['template'] = $template;
+    }
     if (!$this->store()->setIfOwner($job->id(), $entry)) {
       throw new AccessDeniedHttpException('This job is being edited by another user.');
     }
@@ -120,8 +123,12 @@ class TaskJobTempstoreRepository {
   /**
    * Returns dialogs to the tab from which they were opened.
    */
-  public function getEditUrl(JobInterface $job, ?string $section = NULL): Url {
+  public function getEditUrl(JobInterface $job, ?string $section = NULL, ?string $template = NULL): Url {
     $section ??= $this->entry($job)['section'] ?? 'checklist';
+    $template ??= $this->entry($job)['template'] ?? NULL;
+    if ($section === 'templates' && $template !== NULL && isset(($job->get('checklist_templates') ?: [])[$template])) {
+      return Url::fromRoute('entity.task_job.edit_template', ['task_job' => $job->id(), 'template' => $template]);
+    }
     $route = $section === 'checklist' ? 'entity.task_job.edit_form' : 'entity.task_job.edit_' . $section;
     return Url::fromRoute($route, ['task_job' => $job->id()]);
   }

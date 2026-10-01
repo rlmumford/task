@@ -114,7 +114,7 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
     $items = [];
 
     if ($job = $this->getJob()) {
-      foreach ($job->getChecklistItems() as $name => $config) {
+      foreach ($job->getExpandedChecklistItems() as $name => $config) {
         $items[$name] = $this->itemStorage()->create(
           [
             'checklist_type' => $this->getPluginId(),

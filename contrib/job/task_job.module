@@ -5,6 +5,7 @@
  * Task job integration for task entities and checklists.
  */
 
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
@@ -197,5 +198,14 @@ function task_job_plugin_filter_block__task_job_resource_alter(array &$definitio
     if (in_array($id, $blacklist) || in_array($definition['id'], $blacklist)) {
       unset($definitions[$id]);
     }
+  }
+}
+
+/**
+ * Implements hook_menu_local_tasks_alter().
+ */
+function task_job_menu_local_tasks_alter(&$data, $route_name, RefinableCacheableDependencyInterface $cacheability) {
+  if (in_array($route_name, ['entity.task_job.edit_templates', 'entity.task_job.edit_template'], TRUE)) {
+    \Drupal::service('task_job.template_local_tasks')->alter($data, $cacheability);
   }
 }

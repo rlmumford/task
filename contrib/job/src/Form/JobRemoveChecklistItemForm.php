@@ -60,8 +60,9 @@ class JobRemoveChecklistItemForm extends FormBase {
     $job = $this->tempstoreRepository->get($task_job);
     $form_state->set('job', $job);
     $form_state->set('name', $name);
+    $form_state->set('checklist_template', $this->getRequest()->query->get('template'));
 
-    $checklist_items = $job->get('default_checklist');
+    $checklist_items = $job->getChecklistItems($form_state->get('checklist_template'));
     if (!isset($checklist_items[$name])) {
       throw new NotFoundHttpException();
     }
@@ -103,9 +104,9 @@ class JobRemoveChecklistItemForm extends FormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $job = $form_state->get('job');
-    $checklist_items = $job->get('default_checklist');
+    $checklist_items = $job->getChecklistItems($form_state->get('checklist_template'));
     unset($checklist_items[$form_state->get('name')]);
-    $job->set('default_checklist', $checklist_items);
+    $job->setChecklistItems($checklist_items, $form_state->get('checklist_template'));
 
     $this->tempstoreRepository->set($job);
     $form_state->setRedirectUrl($this->tempstoreRepository->getEditUrl($job));

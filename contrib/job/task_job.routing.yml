@@ -147,3 +147,25 @@ entity.task_job.edit_settings:
     _entity_access: 'task_job.update'
   options:
     _admin_route: TRUE
+
+entity.task_job.edit_templates:
+  path: '/admin/config/task/job/{task_job}/edit/templates'
+  defaults:
+    _entity_form: 'task_job.default'
+    _title: 'Edit checklist templates'
+    _job_section: 'templates'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE
+
+entity.task_job.edit_template:
+  path: '/admin/config/task/job/{task_job}/edit/templates/{template}'
+  defaults:
+    _entity_form: 'task_job.default'
+    _title: 'Edit checklist template'
+    _job_section: 'templates'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE

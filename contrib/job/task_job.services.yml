@@ -25,3 +25,6 @@ services:
   plugin.manager.task_job.trigger_action:
     class: Drupal\task_job\TriggerActionManager
     arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@context.handler']
+  task_job.template_local_tasks:
+    class: Drupal\task_job\JobTemplateLocalTasks
+    arguments: ['@task_job.tempstore_repository', '@current_route_match']
