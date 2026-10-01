@@ -44,6 +44,36 @@ class DecisionChecklistTemplatesTest extends KernelTestBase {
   }
 
   /**
+   * Persisted generated items read fixes from their scoped template definition.
+   */
+  public function testGeneratedItemConfigurationRefresh(): void {
+    $job = $this->createJob();
+    $task = Task::create(['title' => 'Review', 'job' => $job]);
+    $task->save();
+    $checklist = $task->checklist->checklist;
+    $parent = $checklist->getItem('review');
+    $parent->setOutcome('decision', 'more');
+    $parent->setComplete();
+    $parent->save();
+    $name = 'review__more__documents__proof';
+    $item = $checklist->getItem($name);
+    $item->save();
+    $uuid = $item->uuid();
+    $items = $job->getChecklistItems('documents');
+    $items['proof']['label'] = 'Review corrected proof';
+    $items['proof']['handler_configuration']['question'] = 'Is the proof sufficient?';
+    $job->setChecklistItems($items, 'documents');
+    $job->save();
+    $task = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id());
+    $checklist = $task->checklist->checklist;
+    $item = $checklist->getItem($name);
+    $this->assertSame($uuid, $item->uuid());
+    $this->assertTrue($checklist->isItemActive($item));
+    $this->assertSame('Review corrected proof', $item->get('title')->value);
+    $this->assertSame('Is the proof sufficient?', $item->getHandler()->getConfiguration()['question']);
+  }
+
+  /**
    * Creates a job with two independent instances of the same template.
    */
   protected function createJob(): Job {

@@ -2,10 +2,12 @@
 
 namespace Drupal\Tests\task_job\Kernel;
 
+use Drupal\Component\Serialization\PhpSerialize;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\Entity\Job;
 use Drupal\task_job\JobConfigurationChecklist;
+use Drupal\user\Entity\User;
 
 /**
  * Tests task checklist resolution across clean and dirty job versions.
@@ -20,7 +22,7 @@ class VersionedJobChecklistTest extends KernelTestBase {
     'entity', 'task', 'task_context', 'task_checklist', 'checklist',
     'task_job', 'entity_template', 'typed_data', 'typed_data_plus', 'views',
     'plugin_reference', 'typed_data_reference', 'typed_data_context_assignment',
-    'inline_entity_form',
+    'inline_entity_form', 'checklist_state_test',
   ];
 
   /**
@@ -72,6 +74,7 @@ class VersionedJobChecklistTest extends KernelTestBase {
     $task->save();
 
     $this->assertSame('Version 6 review', $task->checklist->checklist->getItem('review')->get('title')->value);
+    $task->checklist->checklist->getItem('review')->save();
 
     $version_seven = $resolver->createVersion($base, '7');
     $version_seven->set('default_checklist', [
@@ -98,6 +101,124 @@ class VersionedJobChecklistTest extends KernelTestBase {
 
     $task = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id());
     $this->assertSame('Version 6 dirty review', $task->checklist->checklist->getItem('review')->get('title')->value);
+    $dirty->delete();
+    $task = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id());
+    $this->assertSame('Version 6 review', $task->checklist->checklist->getItem('review')->get('title')->value);
+  }
+
+  /**
+   * Persisted unfinished items follow fixes without rewriting completed work.
+   */
+  public function testStoredItemsUseCurrentConfiguration(): void {
+    $user = User::create(['name' => 'Administrator', 'status' => 1]);
+    $user->save();
+    $this->container->get('current_user')->setAccount($user);
+    $job = Job::create([
+      'id' => 'live_configuration',
+      'label' => 'Live configuration',
+      'default_checklist' => [
+        'review' => [
+          'label' => 'Original review',
+          'handler' => 'decision',
+          'handler_configuration' => [
+            'question' => 'Original question',
+            'options' => ['yes' => ['label' => 'Yes']],
+          ],
+        ],
+      ],
+    ]);
+    $job->save();
+    $resolver = $this->container->get('task_job.version_resolver');
+    $six = $resolver->createVersion($job, '6');
+    $six->save();
+    $task = Task::create(['title' => 'Review', 'job' => $job, 'job_version' => '6']);
+    $task->save();
+    $item = $task->checklist->checklist->getItem('review');
+    $item->save();
+    $identity = [$item->id(), $item->uuid()];
+    $snapshot = PhpSerialize::encode($task->checklist->checklist);
+    $this->assertSame('Original question', $item->getHandler()->getConfiguration()['question']);
+    $dirty = $resolver->createDirtyVersion($six);
+    $items = $dirty->getChecklistItems();
+    $items['review']['label'] = 'Corrected review';
+    $items['review']['handler_configuration']['question'] = 'Corrected question';
+    $items['review']['handler_configuration']['options']['no'] = ['label' => 'No'];
+    $dirty->setChecklistItems($items);
+    $dirty->save();
+    $storage = $this->container->get('entity_type.manager')->getStorage('task');
+    $task = $storage->loadUnchanged($task->id());
+    $item = $task->checklist->checklist->getItem('review');
+    $this->assertSame($identity, [$item->id(), $item->uuid()]);
+    $this->assertSame('Corrected review', $item->get('title')->value);
+    $this->assertSame('Corrected question', $item->getHandler()->getConfiguration()['question']);
+    $this->assertArrayHasKey('no', $item->getHandler()->getConfiguration()['options']);
+    $this->assertTrue($item->isIncomplete());
+    $restored = PhpSerialize::decode($snapshot);
+    $restored_item = $restored->getItem('review');
+    $this->assertSame($identity, [$restored_item->id(), $restored_item->uuid()]);
+    $this->assertSame('Corrected question', $restored_item->getHandler()->getConfiguration()['question']);
+    [, $loaded] = $this->container->get('checklist.item_execution_preparer')->load($item->uuid(), FALSE);
+    $this->assertSame('Corrected question', $loaded->getHandler()->getConfiguration()['question']);
+    $this->assertSame($identity, [$loaded->id(), $loaded->uuid()]);
+    $item->setOutcome('decision', 'no');
+    $item->setComplete();
+    $item->save();
+    $completed = $item->get('completed')->value;
+    $items['review']['label'] = 'Later edit';
+    $items['review']['handler_configuration']['question'] = 'Later question';
+    $dirty->setChecklistItems($items);
+    $dirty->save();
+    $task = $storage->loadUnchanged($task->id());
+    $item = $task->checklist->checklist->getItem('review');
+    $this->assertSame($identity, [$item->id(), $item->uuid()]);
+    $this->assertSame('Corrected review', $item->get('title')->value);
+    $this->assertSame('Corrected question', $item->getHandler()->getConfiguration()['question']);
+    $this->assertSame('no', $item->get('outcomes')->get('decision')->getValue());
+    $this->assertSame($completed, (int) $item->get('completed')->value);
+    $this->assertTrue($item->isComplete());
+  }
+
+  /**
+   * Failed state survives fixes, but cannot be handed to another plugin type.
+   */
+  public function testWorkingStateSurvivesConfigurationFixes(): void {
+    $job = Job::create([
+      'id' => 'state_configuration',
+      'label' => 'State configuration',
+      'default_checklist' => [
+        'work' => [
+          'label' => 'Original work',
+          'handler' => 'state_test',
+          'handler_configuration' => [],
+        ],
+      ],
+    ]);
+    $job->save();
+    $task = Task::create(['title' => 'Work', 'job' => $job]);
+    $task->save();
+    $item = $task->checklist->checklist->getItem('work');
+    $item->setWorkingState('run_id', 'existing-run');
+    $item->setFailed();
+    $item->save();
+    $uuid = $item->uuid();
+    $items = $job->getChecklistItems();
+    $items['work']['label'] = 'Fixed work';
+    $job->setChecklistItems($items);
+    $job->save();
+    $storage = $this->container->get('entity_type.manager')->getStorage('task');
+    $task = $storage->loadUnchanged($task->id());
+    $item = $task->checklist->checklist->getItem('work');
+    $this->assertSame('Fixed work', $item->get('title')->value);
+    $this->assertSame($uuid, $item->uuid());
+    $this->assertTrue($item->isFailed());
+    $this->assertSame('existing-run', $item->get('state')->get('run_id')->getValue());
+    $items['work']['handler'] = 'simply_checkable';
+    $job->setChecklistItems($items);
+    $job->save();
+    $task = $storage->loadUnchanged($task->id());
+    $this->expectException(\DomainException::class);
+    $this->expectExceptionMessage('working state for a different handler');
+    $task->checklist->checklist->getItems();
   }
 
   /**

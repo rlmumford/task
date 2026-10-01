@@ -5,9 +5,11 @@ namespace Drupal\task_job\Plugin\ChecklistType;
 use Drupal\checklist\ChecklistInterface;
 use Drupal\checklist\Plugin\ChecklistType\ChecklistTypeBase;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\Plugin\PluginWithFormsTrait;
 use Drupal\task\Entity\Task;
+use Drupal\task_job\JobChecklist;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\JobVersionResolverInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -78,6 +80,13 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $item_storage, $event_dispatcher);
 
     $this->jobVersionResolver = $job_version_resolver;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getChecklist(FieldableEntityInterface $entity, string $key): ChecklistInterface {
+    return new JobChecklist($this, $entity, $key);
   }
 
   /**
