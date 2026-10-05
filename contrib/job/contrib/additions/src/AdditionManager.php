@@ -3,6 +3,8 @@
 namespace Drupal\task_job_additions;
 
 use Drupal\checklist\ChecklistResolver;
+use Drupal\checklist\ChecklistConditionEvaluator;
+use Drupal\checklist\ChecklistInterface;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Component\Uuid\Uuid;
 use Drupal\Core\Database\Connection;
@@ -34,6 +36,7 @@ class AdditionManager {
     protected LockBackendInterface $lock,
     protected TimeInterface $time,
     protected TaskChecklistRequestStorageInterface $requests,
+    protected ChecklistConditionEvaluator $conditions,
   ) {}
 
   /**
@@ -72,14 +75,21 @@ class AdditionManager {
    * Lists authored choices and addition receipts under current task access.
    */
   public function discover(Task $task): array {
-    [$task, $job] = $this->prepare($task);
+    [$task, $job, $checklist] = $this->prepare($task);
     $templates = [];
     foreach ($job->get('checklist_templates') ?: [] as $name => $definition) {
-      if (!empty($definition['allow_addition']) && !empty($definition['items'])) {
+      if (!empty($definition['allow_addition']) && !empty($definition['items']) && $this->available($checklist, $definition)) {
         $templates[$name] = ['label' => trim($definition['addition_label'] ?? '') ?: $definition['label']];
       }
     }
     return ['templates' => $templates, 'additions' => array_values($this->storage->forTask($task->uuid()))];
+  }
+
+  /**
+   * Requires a match using current task, outcomes and caller contexts.
+   */
+  protected function available(ChecklistInterface $checklist, array $definition): bool {
+    return empty($definition['addition_condition']) || $this->conditions->evaluate($checklist, $definition['addition_condition']) === TRUE;
   }
 
   /**
@@ -107,6 +117,9 @@ class AdditionManager {
       $definitions = $job->get('checklist_templates') ?: [];
       if (empty($definitions[$template]['allow_addition']) || empty($definitions[$template]['items'])) {
         throw new AccessDeniedHttpException('This template is not available for staff addition.');
+      }
+      if (!$this->available($checklist, $definitions[$template])) {
+        throw new AccessDeniedHttpException('This addition is not available for the current task.');
       }
       if (count($this->storage->forTask($task->uuid())) >= 100) {
         throw new ConflictHttpException('This task has reached its addition limit.');

@@ -52,6 +52,18 @@ or resumes an attempt. The receipt records who added the work; the attempt keeps
 its initiator, executor and job authorizer as distinct identities. Later processing
 may be initiated by another authorized task save without rewriting the receipt.
 
+## Compact task controls
+
+Available additions appear in an **Other Actions** dropbutton. Each named action
+submits directly through Drupal Form API, keeping its CSRF protection and the
+same server-side availability/access checks as the API.
+
+Up to five additions fit in the menu. With more choices, the first four remain
+there and **Do something else** opens an inline chooser in the checklist action
+area. The chooser lists all available additions and has Add and Cancel actions.
+Opening or cancelling it does not persist a checklist item or addition receipt.
+The chooser also works without JavaScript through an ordinary form rebuild.
+
 ## Optional HTTP API
 
 Enable `task_job_additions_api` to expose:
@@ -92,3 +104,59 @@ transaction rollback, and local delegated execution approval/revocation. Browser
 tests cover the shared configuration draft, runtime addition, permission-based UI,
 optional route installation, CSRF, payload rejection and HTTP replay. Both suites
 run in the existing task package SQLite/MySQL CI jobs.
+
+## Availability conditions
+
+An exposed template can have an **Addition availability** condition. Its native
+Drupal condition plugin form uses the same contexts and Typed Data Plus selector
+widget as checklist configuration. No condition means always available, subject
+to the existing permission, task access and execution-approval checks.
+
+For example, offer another reference check only after a main checklist decision
+has requested one:
+
+```yaml
+checklist_templates:
+  reference:
+    label: Reference check
+    allow_addition: true
+    addition_label: Request another reference
+    addition_condition:
+      id: condition_string
+      condition_string: 'items.reference_needed.outcomes.decision == "yes"'
+    items: # Existing checklist item definitions go here.
+```
+
+Conditions see the current host as `checklist` / `checklist:entity`, job contexts,
+and checklist outcomes. Native plugins use standard context mappings, including
+property/filter selectors and global `@provider:context` values. Condition groups
+and negation retain their normal semantics. The future addition's own items do
+not exist yet: the availability editor therefore exposes the containing job's
+contexts, not that template's future local outcomes.
+
+UI and API discovery omit unavailable additions. The workspace refreshes its
+Add work control alongside normal checklist row refreshes, including after an
+AJAX decision and during existing progress polling. Unchanged choices retain the
+current selection and request UUID. This does not introduce a separate timer for
+arbitrary external data changes. Creation reloads the task and
+checks the condition again, so a stale displayed option or an earlier API response
+cannot bypass a changed rule. Missing required context values do not match, even
+for a negated condition. Invalid configuration/plugin failures remain errors;
+they do not default to allowing the addition.
+
+A rule becoming false neither cancels existing additions nor stops their items.
+An already recorded request UUID can still be replayed without creating more
+work, subject to the ordinary task/access checks. The condition controls new
+additions only; configure applicability/actionability on the items themselves if
+the work must also depend on continuing conditions. Clean/dirty job version
+resolution applies to the availability rule as well as the item definitions.
+Condition-plugin dependencies are included in the job's exported dependencies
+and execution approval fingerprint through the existing dependency collector.
+
+The browser tests cover configuring, retaining and clearing the rule through the
+job draft, native context selection and API rejection after discovery. Kernel
+tests cover outcome-driven visibility, global user contexts, missing values,
+stale task objects, dirty overrides, idempotent replay and existing work staying
+active after availability changes. Row refresh tests also verify that choices
+appear/disappear and that unchanged choices retain a stable refresh signature.
+See the [real UI walkthrough](../../../../../../../docs/screenshots/job-addition-availability/README.md).

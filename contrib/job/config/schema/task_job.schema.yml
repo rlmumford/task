@@ -74,6 +74,9 @@ task_job.task_job.*:
           allow_addition:
             type: boolean
             label: 'Expose template as an addition'
+          addition_condition:
+            type: condition.plugin.[id]
+            label: 'Addition availability condition'
           addition_label:
             type: label
             label: 'Addition label'

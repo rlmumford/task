@@ -2,6 +2,7 @@
 
 namespace Drupal\Tests\task_job_additions\Kernel;
 
+use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\Entity\Job;
@@ -95,6 +96,33 @@ class ChecklistAdditionsTest extends KernelTestBase {
   }
 
   /**
+   * Row refreshes add and remove choices as current task conditions change.
+   */
+  public function testWorkspaceRefresh(): void {
+    [$job, $task] = $this->work();
+    $templates = $job->get('checklist_templates');
+    $templates['review']['addition_condition'] = [
+      'id' => 'condition_string',
+      'condition_string' => 'checklist.title.value == "Support task"',
+    ];
+    $job->set('checklist_templates', $templates)->save();
+    $hashes = [];
+    foreach (['Support task', 'Support task', 'Other task'] as $title) {
+      $task->set('title', $title)->save();
+      $checklist = $this->container->get('checklist.resolver')->resolve($this->reload($task), 'checklist');
+      $response = new AjaxResponse();
+      $this->container->get('checklist.row_updater')->refresh($response, $checklist);
+      $commands = array_values(array_filter($response->getCommands(), static fn(array $command): bool => $command['command'] === 'taskJobAdditionChoices'));
+      $this->assertCount(1, $commands);
+      $this->assertSame('#task-job-additions-' . $task->uuid(), $commands[0]['selector']);
+      $this->assertSame($title === 'Support task', str_contains($commands[0]['data'], 'Review evidence'));
+      $hashes[] = $commands[0]['choicesHash'];
+    }
+    $this->assertSame($hashes[0], $hashes[1]);
+    $this->assertNotSame($hashes[1], $hashes[2]);
+  }
+
+  /**
    * Repeated requests are idempotent; independent instances isolate data.
    */
   public function testIndependentInstancesAndIdempotency(): void {
@@ -160,7 +188,11 @@ class ChecklistAdditionsTest extends KernelTestBase {
     $items['record']['label'] = 'Corrected outcome';
     $items['decision']['label'] = 'Changed decision';
     $dirty->setChecklistItems($items, 'review');
+    $templates = $dirty->get('checklist_templates');
+    $templates['review']['addition_condition'] = ['id' => 'condition_constant:false'];
+    $dirty->set('checklist_templates', $templates);
     $dirty->save();
+    $this->assertSame([], $manager->discover($task)['templates']);
     $checklist = $this->reload($task)->checklist->checklist;
     $this->assertSame($dirty->id(), $checklist->getType()->getJob()->id());
     $this->assertTrue($checklist->getItem($prefix . 'record')->isIncomplete());
@@ -337,6 +369,102 @@ class ChecklistAdditionsTest extends KernelTestBase {
     $this->assertSame([], $manager->discover($task)['templates']);
     // Replay is harmless even after this template stops accepting new work.
     $this->assertSame($id, $manager->add($task, 'review', $id)['id']);
+  }
+
+  /**
+   * Discovery and mutation recheck current data without changing existing work.
+   */
+  public function testAvailabilityAndStaleRequest(): void {
+    [$job, $task] = $this->work();
+    $templates = $job->get('checklist_templates');
+    $templates['review']['addition_condition'] = [
+      'id' => 'condition_string',
+      'condition_string' => 'checklist.title.value == "Support task"',
+    ];
+    $job->set('checklist_templates', $templates)->save();
+    $manager = $this->container->get('task_job_additions.manager');
+    $this->assertArrayHasKey('review', $manager->discover($task)['templates']);
+    $id = $this->container->get('uuid')->generate();
+    $manager->add($task, 'review', $id);
+    $changed = $this->reload($task);
+    $changed->set('title', 'No more reviews')->save();
+    // The caller still holds the task from before the title changed.
+    $this->assertSame([], $manager->discover($task)['templates']);
+    $this->assertSame($id, $manager->add($task, 'review', $id)['id']);
+    $existing = $this->reload($task)->checklist->checklist;
+    $this->assertTrue($existing->isItemActive($existing->getItem(AdditionDefinitions::prefix($id) . 'decision')));
+    try {
+      $manager->add($task, 'review', $this->container->get('uuid')->generate());
+      $this->fail('A stale discovery response cannot authorize new work.');
+    }
+    catch (AccessDeniedHttpException) {
+      $this->assertCount(1, $manager->discover($task)['additions']);
+    }
+    $changed->set('title', 'Support task')->save();
+    $this->assertArrayHasKey('review', $manager->discover($task)['templates']);
+  }
+
+  /**
+   * Conditions consume persisted outcomes, groups, and global user contexts.
+   */
+  public function testOutcomeAndProviderConditions(): void {
+    [$job, $task] = $this->work();
+    $job->set('default_checklist', [
+      'gate' => [
+        'label' => 'Review needed?',
+        'handler' => 'decision',
+        'handler_configuration' => ['options' => ['yes' => ['label' => 'Yes']]],
+      ],
+    ]);
+    $templates = $job->get('checklist_templates');
+    $templates['review']['addition_condition'] = [
+      'id' => 'condition_and',
+      'conditions' => [
+        ['id' => 'condition_string', 'condition_string' => 'items.gate.outcomes.decision == "yes"'],
+        [
+          'id' => 'user_role',
+          'roles' => ['staff'],
+          'context_mapping' => ['user' => '@user.current_user_context:current_user'],
+        ],
+      ],
+    ];
+    $job->set('checklist_templates', $templates)->save();
+    $manager = $this->container->get('task_job_additions.manager');
+    $this->assertSame([], $manager->discover($task)['templates']);
+    $checklist = $this->reload($task)->checklist->checklist;
+    $this->container->get('checklist.action_operation_dispatcher')->execute($checklist, 'gate', 'choose', ['choice' => 'yes']);
+    $this->assertArrayHasKey('review', $manager->discover($task)['templates']);
+    $manager->add($task, 'review', $this->container->get('uuid')->generate());
+    $this->assertCount(1, $manager->discover($task)['additions']);
+    $job->calculateDependencies();
+    $this->assertContains('typed_data_plus', $job->getDependencies()['module']);
+    $this->assertContains('user', $job->getDependencies()['module']);
+  }
+
+  /**
+   * Missing required values cannot become permission through negation.
+   */
+  public function testMissingRequiredAvailabilityContext(): void {
+    [$job, $task] = $this->work();
+    $job->set('default_checklist', [
+      'source' => [
+        'label' => 'Source',
+        'handler' => 'context_producer',
+        'handler_configuration' => [],
+      ],
+    ]);
+    $templates = $job->get('checklist_templates');
+    $templates['review']['addition_condition'] = [
+      'id' => 'user_role',
+      'roles' => ['staff'],
+      'negate' => TRUE,
+      'context_mapping' => ['user' => 'item:source:user'],
+    ];
+    $job->set('checklist_templates', $templates)->save();
+    $manager = $this->container->get('task_job_additions.manager');
+    $this->assertSame([], $manager->discover($task)['templates']);
+    $this->expectException(AccessDeniedHttpException::class);
+    $manager->add($task, 'review', $this->container->get('uuid')->generate());
   }
 
 }

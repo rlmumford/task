@@ -9,4 +9,9 @@ services:
       - { name: event_subscriber }
   task_job_additions.manager:
     class: Drupal\task_job_additions\AdditionManager
-    arguments: ['@entity_type.manager', '@checklist.resolver', '@task_job.version_resolver', '@task_job_additions.storage', '@task_job.execution_authorization', '@current_user', '@database', '@lock', '@datetime.time', '@task_checklist.request_storage']
+    arguments: ['@entity_type.manager', '@checklist.resolver', '@task_job.version_resolver', '@task_job_additions.storage', '@task_job.execution_authorization', '@current_user', '@database', '@lock', '@datetime.time', '@task_checklist.request_storage', '@checklist.condition_evaluator']
+  task_job_additions.workspace:
+    class: Drupal\task_job_additions\AdditionWorkspace
+    arguments: ['@task_job_additions.manager', '@form_builder']
+    tags:
+      - { name: event_subscriber }

@@ -8,10 +8,10 @@
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Form\SubformState;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\Form\JobEditForm;
-use Drupal\task_job_additions\Form\AddWorkForm;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Drupal\task_job\JobConfigurationChecklist;
 
 /**
  * Implements hook_form_alter().
@@ -37,7 +37,33 @@ function task_job_additions_form_alter(array &$form, FormStateInterface $form_st
     '#default_value' => $templates[$name]['addition_label'] ?? '',
     '#weight' => -1,
   ];
+  $checklist = JobConfigurationChecklist::createFromJob($object->getEntity());
+  $contexts = \Drupal::service('checklist.context_collector')->collectConfigContexts($checklist);
+  $form['templates'][$name]['addition_condition'] = \Drupal::service('checklist.condition_configuration_form')->build([
+    '#type' => 'details',
+    '#title' => t('Addition availability'),
+    '#description' => t('Offer this addition only when the condition matches the current checklist. Missing required context values prevent a match. Existing additions are unaffected.'),
+    '#open' => !empty($templates[$name]['addition_condition']),
+    '#parents' => ['templates', $name, 'addition_condition'],
+    '#weight' => -1,
+  ], $form_state, $templates[$name]['addition_condition'] ?? [], $contexts);
+  array_unshift($form['#validate'], 'task_job_additions_validate_job');
   $form['#entity_builders'][] = 'task_job_additions_build_job';
+}
+
+/**
+ * Validates condition plugin settings before the job builds its working entity.
+ */
+function task_job_additions_validate_job(array &$form, FormStateInterface $form_state): void {
+  if (($form_state->getTriggeringElement()['#limit_validation_errors'] ?? NULL) === []) {
+    return;
+  }
+  $name = $form_state->get('selected_template');
+  $element = &$form['templates'][$name]['addition_condition'];
+  $state = SubformState::createForSubform($element, $form, $form_state);
+  $condition = \Drupal::service('checklist.condition_configuration_form')->configuration($element, $state);
+  // Use an empty array to distinguish clearing a rule from an untouched tab.
+  $form_state->set('addition_condition_configuration', $condition ?? []);
 }
 
 /**
@@ -49,6 +75,12 @@ function task_job_additions_build_job($entity_type, EntityInterface $entity, arr
     if (isset($templates[$name]) && isset($form['templates'][$name]['allow_addition'])) {
       $templates[$name]['allow_addition'] = !empty($values['allow_addition']);
       $templates[$name]['addition_label'] = trim($values['addition_label'] ?? '');
+      if ($form_state->has('addition_condition_configuration')) {
+        unset($templates[$name]['addition_condition']);
+        if ($condition = $form_state->get('addition_condition_configuration')) {
+          $templates[$name]['addition_condition'] = $condition;
+        }
+      }
     }
   }
   $entity->set('checklist_templates', $templates);
@@ -61,17 +93,9 @@ function task_job_additions_entity_view(array &$build, EntityInterface $entity, 
   if (!$entity instanceof Task || !isset($build['checklist'][0]['actions'])) {
     return;
   }
-  // The choices and access depend on current mutable task/job state and grants.
-  $build['#cache']['max-age'] = 0;
-  try {
-    $choices = \Drupal::service('task_job_additions.manager')->discover($entity);
-    if ($choices['templates']) {
-      $build['checklist'][0]['actions']['add_work'] = \Drupal::formBuilder()->getForm(AddWorkForm::class, $entity);
-    }
-  }
-  catch (AccessDeniedHttpException) {
-    // Viewing a task does not imply permission to add work to it.
-  }
+  $build['checklist'][0]['actions']['add_work'] = \Drupal::service('task_job_additions.workspace')->build($entity);
+  $build['checklist'][0]['actions']['add_work']['#weight'] = 1;
+  $build['checklist'][0]['actions']['completion_form']['#weight'] = 2;
 }
 
 /**
