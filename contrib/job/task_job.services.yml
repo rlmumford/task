@@ -32,3 +32,9 @@ services:
   task_job.assignment_rules:
     class: Drupal\task_job\AssignmentRules
     arguments: ['@checklist.condition_evaluator', '@context.handler']
+
+  task_job.execution_authorization:
+    class: Drupal\task_job\JobExecutionAuthorization
+    arguments: ['@keyvalue', '@current_user', '@entity_type.manager', '@config.storage', '@task_job.version_resolver', '@checklist.context_collector', '@context.handler', '@uuid', '@datetime.time']
+    tags:
+      - { name: event_subscriber }

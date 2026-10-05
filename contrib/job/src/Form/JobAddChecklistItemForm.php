@@ -3,12 +3,16 @@
 namespace Drupal\task_job\Form;
 
 use Drupal\checklist\ChecklistContextCollectorInterface;
+use Drupal\checklist\Plugin\ChecklistItemHandler\IterativeChecklistItemHandlerInterface;
 use Drupal\checklist\Form\ConditionConfigurationForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\SubformState;
 use Drupal\task_job\JobConfigurationChecklist;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\JobChecklistExpansion;
+use Drupal\task_job\ExecutionRule;
+use Drupal\task_job\JobExecutionAuthorization;
+use Drupal\Core\Plugin\Context\ContextHandlerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -29,6 +33,13 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
   protected ConditionConfigurationForm $conditions;
 
   /**
+   * Builds the standard execution-context mapping widget.
+   *
+   * @var \Drupal\Core\Plugin\Context\ContextHandlerInterface
+   */
+  protected ContextHandlerInterface $executionContexts;
+
+  /**
    * Named template being edited, or NULL for the default checklist.
    */
   protected ?string $checklistTemplate = NULL;
@@ -43,6 +54,7 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
       $container->get('plugin.manager.checklist_item_handler'),
       $container->get('config.factory')
     ))->setChecklistContextCollector($container->get('checklist.context_collector'));
+    $instance->executionContexts = $container->get('context.handler');
     $instance->conditions = $container->get('checklist.condition_configuration_form');
     return $instance;
   }
@@ -123,6 +135,32 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
       $state = SubformState::createForSubform($element, $form, $form_state);
       $form['conditions'][$gate] = $this->conditions->build($element, $state, $configuration['conditions'][$gate] ?? [], $contexts);
     }
+    $execution = $form_state->get('execution_configuration') ?? ['mode' => 'self'];
+    $plugin = $form_state->get('configured_plugin');
+    // Mixed handlers choose their method from live item state and contexts.
+    // Authoring has neither: configure iteration capability here and let the
+    // execution preparer enforce the automatic method at runtime.
+    $supports_iterations = $plugin instanceof IterativeChecklistItemHandlerInterface;
+    $consumer = new ExecutionRule($execution);
+    $form['execution'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Execution identity'),
+      '#tree' => TRUE,
+      '#open' => ($execution['mode'] ?? 'self') === 'context',
+      '#access' => $supports_iterations && $this->currentUser()->hasPermission(JobExecutionAuthorization::PERMISSION),
+      'mode' => [
+        '#type' => 'select',
+        '#title' => $this->t('Run automatic work as'),
+        '#options' => ['self' => $this->t('Initiating user'), 'context' => $this->t('Context-selected user')],
+        '#default_value' => $execution['mode'] ?? 'self',
+        '#description' => $this->t('Saving the job authorizes its delegated work. The selected user is fixed for each attempt; account permissions are checked whenever it runs.'),
+      ],
+    ];
+    $form['execution']['context_mapping'] = method_exists($this->executionContexts, 'getContextAssignmentElement')
+      ? $this->executionContexts->getContextAssignmentElement($consumer, $contexts)
+      : ['executor' => $this->executionContexts->getContextSelectElement($contexts, $consumer->getContextDefinition('executor'), $execution['context_mapping']['executor'] ?? '')];
+    $form['execution']['context_mapping']['executor']['#required'] = FALSE;
+    $form['execution']['context_mapping']['#states']['visible'] = [':input[name="execution[mode]"]' => ['value' => 'context']];
     $form['contexts'] = ['#type' => 'details', '#title' => $this->t('Available contexts')];
     foreach ($contexts as $name => $context) {
       $form['contexts'][$name] = [
@@ -143,6 +181,14 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
     if (($form_state->getTriggeringElement()['#limit_validation_errors'] ?? NULL) === []) {
       return;
     }
+    $execution = $form_state->get('execution_configuration') ?? ['mode' => 'self'];
+    if (!empty($form['execution']['#access'])) {
+      $execution = $form_state->getValue('execution') ?: ['mode' => 'self'];
+      if (($execution['mode'] ?? 'self') === 'context' && empty($execution['context_mapping']['executor'])) {
+        $form_state->setError($form['execution']['context_mapping']['executor'], $this->t('Select the execution user context.'));
+      }
+    }
+    $form_state->set('validated_execution', $execution);
     $name = $form_state->getValue('name');
     if (!preg_match('/^[a-z][a-z0-9_]*$/D', $name) || (empty($form['name']['#disabled']) && isset($form_state->get('job')->getChecklistItems($form_state->get('checklist_template'))[$name]))) {
       $form_state->setError($form['name'], $this->t('Use a unique machine name starting with a lowercase letter, followed by lowercase letters, digits or underscores.'));
@@ -199,6 +245,7 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
       'label' => $form_state->getValue('label'),
       'handler' => $plugin->getPluginId(),
       'handler_configuration' => $plugin->getConfiguration(),
+      'execution' => $form_state->get('validated_execution') ?? ['mode' => 'self'],
     ];
     $job->setChecklistItems($checklist_items, $form_state->get('checklist_template'));
 

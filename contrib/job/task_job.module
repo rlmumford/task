@@ -5,6 +5,7 @@
  * Task job integration for task entities and checklists.
  */
 
+use Drupal\task_job\JobInterface;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -211,4 +212,32 @@ function task_job_menu_local_tasks_alter(&$data, $route_name, RefinableCacheable
   if (in_array($route_name, ['entity.task_job.edit_templates', 'entity.task_job.edit_template'], TRUE)) {
     \Drupal::service('task_job.template_local_tasks')->alter($data, $cacheability);
   }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_presave().
+ */
+function task_job_task_job_presave(JobInterface $job) {
+  \Drupal::service('task_job.execution_authorization')->checkSave($job);
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_insert().
+ */
+function task_job_task_job_insert(JobInterface $job) {
+  \Drupal::service('task_job.execution_authorization')->saved($job);
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ */
+function task_job_task_job_update(JobInterface $job) {
+  \Drupal::service('task_job.execution_authorization')->saved($job);
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_delete().
+ */
+function task_job_task_job_delete(JobInterface $job) {
+  \Drupal::keyValue('task_job.execution_authorization')->delete($job->id());
 }

@@ -37,6 +37,7 @@ class JobConfigureChecklistItemForm extends JobAddChecklistItemForm {
       throw new NotFoundHttpException();
     }
     $item = $checklist_items[$name];
+    $form_state->set('execution_configuration', $item['execution'] ?? ['mode' => 'self']);
 
     $form = parent::buildForm(
       $form,

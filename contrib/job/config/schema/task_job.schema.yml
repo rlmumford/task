@@ -168,6 +168,18 @@ task_job.checklist_item:
     handler:
       type: string
       label: 'The handler plugin id'
+    execution:
+      type: mapping
+      label: 'Execution policy'
+      mapping:
+        mode:
+          type: string
+          label: 'Self or context-selected execution'
+        context_mapping:
+          type: sequence
+          label: 'Executor context mapping'
+          sequence:
+            type: string
     handler_configuration:
       type: checklist_item_handler.[%parent.handler]
       label: 'The handler configuration'

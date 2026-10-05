@@ -2,6 +2,7 @@
 
 namespace Drupal\task_job\Form;
 
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Drupal\Core\Ajax\ReplaceCommand;
 use Drupal\checklist\ChecklistItemHandlerManager;
 use Drupal\Component\Serialization\Json;
@@ -1117,7 +1118,14 @@ class JobEditForm extends JobForm {
     if ($draft->isVersioned() && !$draft->isDirty()) {
       $this->entity = $this->jobVersionResolver->createDirtyVersion($draft);
     }
-    $this->entity->save();
+    try {
+      $this->entity->save();
+    }
+    catch (AccessDeniedHttpException $exception) {
+      $this->tempstoreRepository->set($draft);
+      $this->messenger()->addError($exception->getMessage());
+      return;
+    }
     $this->tempstoreRepository->delete($draft);
     $this->messenger()->addStatus($this->t('The job has been saved.'));
     $form_state->setRedirectUrl($this->tempstoreRepository->getEditUrl($this->entity, $this->section($form_state), $form_state->get('selected_template')));

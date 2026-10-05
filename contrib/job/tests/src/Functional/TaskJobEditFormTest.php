@@ -21,7 +21,7 @@ class TaskJobEditFormTest extends BrowserTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = ['block', 'task_job', 'task_dependency_job'];
+  protected static $modules = ['block', 'task_job', 'task_dependency_job', 'checklist_state_test'];
 
   /**
    * Creates a job with an editable trigger and logs in its administrator.
@@ -124,6 +124,45 @@ class TaskJobEditFormTest extends BrowserTestBase {
     $this->assertSession()->fieldValueEquals('label', 'Draft label');
     $this->switchTab([], 'Triggers');
     $this->assertSession()->fieldValueEquals('triggers[replacement][action][configuration][dependency_action]', 'invalidate');
+  }
+
+  /**
+   * Delegation stays in the draft until an authorized configurer saves the job.
+   */
+  public function testExecutionApprovalOnExplicitSave(): void {
+    $author = $this->drupalCreateUser([
+      'administer task jobs',
+      'authorize delegated checklist execution',
+    ]);
+    $this->drupalLogin($author);
+    $this->drupalGet('/admin/config/task/job/follow_up/checklist/add/single_step_test');
+    $this->assertSession()->fieldExists('execution[mode]');
+    $this->assertSession()->elementAttributeContains('css', '[name="execution[context_mapping][executor]"]', 'data-autocomplete-path', 'typed_data_context_assignment_autocomplete');
+    $this->submitForm([
+      'name' => 'work',
+      'label' => 'Approved work',
+      'execution[mode]' => 'context',
+      'execution[context_mapping][executor]' => 'checklist:entity.assignee.entity',
+    ], 'Add');
+    $this->assertSession()->pageTextContains('Approved work');
+    $this->assertSame([], $this->saved()->getChecklistItems());
+    $grants = $this->container->get('keyvalue')->get('task_job.execution_authorization');
+    $this->assertNull($grants->get('follow_up'));
+    $this->submitForm([], 'Save');
+    $this->assertSession()->pageTextContains('The job has been saved.');
+    $this->assertSame((int) $author->id(), $grants->get('follow_up')['authorizer']);
+    $this->assertSame('context', $this->saved()->getChecklistItems()['work']['execution']['mode']);
+
+    // Expire the first author's draft lock before the second editor enters.
+    $this->container->get('tempstore.shared')->get('task_jobtask_job')->delete('follow_up');
+    $this->drupalLogin($this->drupalCreateUser(['administer task jobs']));
+    $this->drupalGet('/admin/config/task/job/follow_up/edit');
+    $this->clickLink('configure');
+    $this->assertSession()->fieldNotExists('execution[mode]');
+    $this->submitForm(['label' => 'Unauthorized change'], 'Update');
+    $this->submitForm([], 'Save');
+    $this->assertSession()->pageTextContains('requires permission to authorize delegated checklist execution');
+    $this->assertSame('Approved work', $this->saved()->getChecklistItems()['work']['label']);
   }
 
   /**

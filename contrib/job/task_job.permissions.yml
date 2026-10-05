@@ -1,2 +1,7 @@
 administer task jobs:
   title: 'Administer Task Jobs'
+
+authorize delegated checklist execution:
+  title: 'Authorize delegated checklist execution'
+  description: 'Approve job items to execute as context-selected users. Changes to jobs containing delegation require this permission.'
+  restrict access: true
