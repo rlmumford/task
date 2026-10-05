@@ -39,6 +39,13 @@ class JobChecklist extends Checklist {
   /**
    * {@inheritdoc}
    */
+  protected function getDefaultItems(): array {
+    return $this->getType()->getDefaultItemsForTask($this->getEntity());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function applyItemDefinition(ChecklistItemInterface $stored, ChecklistItemInterface $definition): void {
     parent::applyItemDefinition($stored, $definition);
     // Completed configuration is part of the receipt, including resolved

@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * @file
+ * Storage for separately identified additions to a task checklist.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function task_job_additions_schema() {
+  return [
+    'task_job_checklist_addition' => [
+      'description' => 'Immutable receipts for job template instances added to tasks.',
+      'fields' => [
+        'id' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'task_uuid' => ['type' => 'varchar_ascii', 'length' => 36, 'not null' => TRUE],
+        'job' => ['type' => 'varchar_ascii', 'length' => 255, 'not null' => TRUE],
+        'job_version' => ['type' => 'varchar_ascii', 'length' => 128, 'not null' => TRUE, 'default' => ''],
+        'template' => ['type' => 'varchar_ascii', 'length' => 128, 'not null' => TRUE],
+        'actor' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE],
+        'created' => ['type' => 'int', 'size' => 'big', 'not null' => TRUE],
+      ],
+      'primary key' => ['id'],
+      'indexes' => ['task' => ['task_uuid']],
+    ],
+  ];
+}

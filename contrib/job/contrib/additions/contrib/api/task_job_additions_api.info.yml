@@ -1,0 +1,7 @@
+name: Task Job Additions API
+type: module
+description: Optional HTTP discovery and creation of approved task checklist additions.
+package: Tasks
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task:task_job_additions

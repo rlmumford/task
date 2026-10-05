@@ -1,0 +1,29 @@
+task_job_additions_api.discover:
+  path: '/task/{task}/checklist/additions'
+  defaults:
+    _controller: '\Drupal\task_job_additions_api\Controller\AdditionController::discover'
+  methods: ['GET']
+  requirements:
+    _permission: 'add task checklist templates'
+    _format: 'json'
+  options:
+    no_cache: TRUE
+    parameters:
+      task:
+        type: entity:task
+
+task_job_additions_api.add:
+  path: '/task/{task}/checklist/additions'
+  defaults:
+    _controller: '\Drupal\task_job_additions_api\Controller\AdditionController::add'
+  methods: ['POST']
+  requirements:
+    _permission: 'add task checklist templates'
+    _user_is_logged_in: 'TRUE'
+    _csrf_request_header_token: 'TRUE'
+    _format: 'json'
+  options:
+    no_cache: TRUE
+    parameters:
+      task:
+        type: entity:task

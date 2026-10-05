@@ -20,6 +20,23 @@ final class JobChecklistExpansion {
   }
 
   /**
+   * Expands a separately recorded template instance with local outcome aliases.
+   */
+  public static function instance(string $template, array $templates, string $prefix): array {
+    if (!isset($templates[$template])) {
+      return [];
+    }
+    $items = $templates[$template]['items'] ?? [];
+    $aliases = [];
+    foreach (array_keys($items) as $name) {
+      $aliases[$name] = $prefix . $name;
+    }
+    $result = [];
+    self::append($result, $items, $templates, $prefix, [], [['aliases' => $aliases, 'context_mapping' => []]], [$template]);
+    return $result;
+  }
+
+  /**
    * Adds one scope and its nested decisions in checklist order.
    */
   private static function append(array &$result, array $items, array $templates, string $prefix = '', array $requirements = [], array $scopes = [], array $ancestors = []): void {
@@ -28,7 +45,7 @@ final class JobChecklistExpansion {
       if (strlen($name) > 255 || isset($result[$name]) || count($result) >= 1000) {
         throw new \InvalidArgumentException(sprintf('Invalid or duplicate expanded checklist name "%s".', $name));
       }
-      if ($requirements) {
+      if ($requirements || $scopes) {
         $item['derivation'] = ['requirements' => $requirements, 'scopes' => $scopes];
       }
       $result[$name] = $item;

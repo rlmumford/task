@@ -144,6 +144,20 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
   }
 
   /**
+   * Requires local approval before creating or executing delegated work.
+   */
+  public function approvedGrant(JobInterface $job): array {
+    $grant = $this->keyValue->get('task_job.execution_authorization')->get($job->id());
+    if (!$grant || $grant['fingerprint'] !== $this->fingerprint($job)) {
+      throw new AccessDeniedHttpException('This job definition needs local approval for delegated execution.');
+    }
+    if (!$this->activeAuthorizer($grant['authorizer'])) {
+      throw new AccessDeniedHttpException('The job execution authorizer is no longer authorized.');
+    }
+    return $grant;
+  }
+
+  /**
    * Authorizes only an item slot resolved from the task's saved job version.
    */
   public function authorize(ChecklistExecutionAuthorizationEvent $event): void {
@@ -162,7 +176,7 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
     if (!$job) {
       return;
     }
-    $definition = $job->getExpandedChecklistItems()[$event->item->getName()] ?? NULL;
+    $definition = $type->getItemDefinitions($task, $job)[$event->item->getName()] ?? NULL;
     if (!$definition || ($definition['execution']['mode'] ?? 'self') !== 'context') {
       return;
     }
@@ -180,13 +194,7 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
     if ($handler->getPluginId() !== $expected->getPluginId() || $handler->getConfiguration() !== $expected->getConfiguration()) {
       throw new AccessDeniedHttpException('The item differs from the authorized job definition.');
     }
-    $grant = $this->keyValue->get('task_job.execution_authorization')->get($job->id());
-    if (!$grant || $grant['fingerprint'] !== $this->fingerprint($job)) {
-      throw new AccessDeniedHttpException('This job definition needs local approval for delegated execution.');
-    }
-    if (!$this->activeAuthorizer($grant['authorizer'])) {
-      throw new AccessDeniedHttpException('The job execution authorizer is no longer authorized.');
-    }
+    $grant = $this->approvedGrant($job);
     if ($event->attempt) {
       // Continuations retain the original identity after reassignment.
       $executor = $event->attempt->executor;

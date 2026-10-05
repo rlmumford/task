@@ -10,6 +10,7 @@ use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\Plugin\PluginWithFormsTrait;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\JobChecklist;
+use Drupal\task_job\Event\JobChecklistDefinitionsEvent;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\JobVersionResolverInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -120,25 +121,49 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
       return parent::getDefaultItems();
     }
 
-    $items = [];
+    return $this->createItems($this->getJob()?->getExpandedChecklistItems() ?? []);
+  }
 
-    if ($job = $this->getJob()) {
-      foreach ($job->getExpandedChecklistItems() as $name => $config) {
-        $items[$name] = $this->itemStorage()->create(
-          [
-            'checklist_type' => $this->getPluginId(),
-            'name' => $name,
-            'derivation' => $config['derivation'] ?? [],
-            'title' => $config['label'],
-            'handler' => [
-              'id' => $config['handler'],
-              'configuration' => $config['handler_configuration'],
-            ],
-          ]
-        );
-      }
+  /**
+   * Resolves definitions for a particular task without copying job config.
+   */
+  public function getItemDefinitions(Task $task, ?JobInterface $job = NULL): array {
+    $job ??= $this->getJob();
+    if (!$job) {
+      return [];
     }
+    $event = new JobChecklistDefinitionsEvent($task, $job, $job->getExpandedChecklistItems());
+    $this->eventDispatcher->dispatch($event, JobChecklistDefinitionsEvent::NAME);
+    if (count($event->definitions) > 1000) {
+      throw new \InvalidArgumentException('The task checklist exceeds 1,000 definitions.');
+    }
+    return $event->definitions;
+  }
 
+  /**
+   * Builds host-specific items, preserving legacy configuration overrides.
+   */
+  public function getDefaultItemsForTask(Task $task): array {
+    if (isset($this->configuration['default_items'])) {
+      return $this->getDefaultItems();
+    }
+    return $this->createItems($this->getItemDefinitions($task));
+  }
+
+  /**
+   * Creates unsaved item definitions for normal checklist reconciliation.
+   */
+  protected function createItems(array $definitions): array {
+    $items = [];
+    foreach ($definitions as $name => $config) {
+      $items[$name] = $this->itemStorage()->create([
+        'checklist_type' => $this->getPluginId(),
+        'name' => $name,
+        'derivation' => $config['derivation'] ?? [],
+        'title' => $config['label'],
+        'handler' => ['id' => $config['handler'], 'configuration' => $config['handler_configuration']],
+      ]);
+    }
     return $items;
   }
 

@@ -1,0 +1,12 @@
+services:
+  task_job_additions.storage:
+    class: Drupal\task_job_additions\AdditionStorage
+    arguments: ['@database']
+  task_job_additions.definitions:
+    class: Drupal\task_job_additions\AdditionDefinitions
+    arguments: ['@task_job_additions.storage']
+    tags:
+      - { name: event_subscriber }
+  task_job_additions.manager:
+    class: Drupal\task_job_additions\AdditionManager
+    arguments: ['@entity_type.manager', '@checklist.resolver', '@task_job.version_resolver', '@task_job_additions.storage', '@task_job.execution_authorization', '@current_user', '@database', '@lock', '@datetime.time', '@task_checklist.request_storage']

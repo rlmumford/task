@@ -1,0 +1,82 @@
+<?php
+
+/**
+ * @file
+ * Authoring and task workspace integration for explicitly available additions.
+ */
+
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\task\Entity\Task;
+use Drupal\task_job\Form\JobEditForm;
+use Drupal\task_job_additions\Form\AddWorkForm;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+
+/**
+ * Implements hook_form_alter().
+ */
+function task_job_additions_form_alter(array &$form, FormStateInterface $form_state, $form_id): void {
+  $object = $form_state->getFormObject();
+  $name = $form_state->get('selected_template');
+  if (!$object instanceof JobEditForm || !$name || !isset($form['templates'][$name])) {
+    return;
+  }
+  $templates = $object->getEntity()->get('checklist_templates') ?: [];
+  $form['templates'][$name]['allow_addition'] = [
+    '#type' => 'checkbox',
+    '#title' => t('Expose template as an addition'),
+    '#description' => t('Users also need permission to add checklist templates and edit the task. Each addition gets independent items and uses this task’s job version and contexts.'),
+    '#default_value' => !empty($templates[$name]['allow_addition']),
+    '#weight' => -2,
+  ];
+  $form['templates'][$name]['addition_label'] = [
+    '#type' => 'textfield',
+    '#title' => t('Addition label'),
+    '#description' => t('Shown in Add work. Leave blank to use the template label.'),
+    '#default_value' => $templates[$name]['addition_label'] ?? '',
+    '#weight' => -1,
+  ];
+  $form['#entity_builders'][] = 'task_job_additions_build_job';
+}
+
+/**
+ * Keeps the addition option in the job's working draft until explicit Save.
+ */
+function task_job_additions_build_job($entity_type, EntityInterface $entity, array &$form, FormStateInterface $form_state): void {
+  $templates = $entity->get('checklist_templates') ?: [];
+  foreach ($form_state->getValue('templates', []) as $name => $values) {
+    if (isset($templates[$name]) && isset($form['templates'][$name]['allow_addition'])) {
+      $templates[$name]['allow_addition'] = !empty($values['allow_addition']);
+      $templates[$name]['addition_label'] = trim($values['addition_label'] ?? '');
+    }
+  }
+  $entity->set('checklist_templates', $templates);
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function task_job_additions_entity_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode): void {
+  if (!$entity instanceof Task || !isset($build['checklist'][0]['actions'])) {
+    return;
+  }
+  // The choices and access depend on current mutable task/job state and grants.
+  $build['#cache']['max-age'] = 0;
+  try {
+    $choices = \Drupal::service('task_job_additions.manager')->discover($entity);
+    if ($choices['templates']) {
+      $build['checklist'][0]['actions']['add_work'] = \Drupal::formBuilder()->getForm(AddWorkForm::class, $entity);
+    }
+  }
+  catch (AccessDeniedHttpException) {
+    // Viewing a task does not imply permission to add work to it.
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_delete().
+ */
+function task_job_additions_task_delete(EntityInterface $entity): void {
+  \Drupal::service('task_job_additions.storage')->deleteTask($entity->uuid());
+}

@@ -71,6 +71,12 @@ task_job.task_job.*:
           label:
             type: label
             label: 'Template label'
+          allow_addition:
+            type: boolean
+            label: 'Expose template as an addition'
+          addition_label:
+            type: label
+            label: 'Addition label'
           items:
             type: sequence
             label: 'Checklist items'
