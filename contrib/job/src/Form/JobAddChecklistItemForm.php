@@ -201,7 +201,11 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
       }
     }
     $form_state->set('checklist_conditions', $gates);
-    if (!$form_state->hasAnyErrors() && $form_state->get('configured_plugin')->getPluginId() === 'decision') {
+    $expands_templates = in_array($form_state->get('configured_plugin')->getPluginId(), [
+      'decision',
+      'add_checklist_template',
+    ], TRUE);
+    if (!$form_state->hasAnyErrors() && $expands_templates) {
       $candidate = clone $form_state->get('job');
       $template = $form_state->get('checklist_template');
       $items = $candidate->getChecklistItems($template);

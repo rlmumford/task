@@ -189,3 +189,55 @@ contexts, pinned versions, dirty overrides and unsaved authoring contexts.
 `TaskJobEditFormTest::testAssignmentRuleEditor` covers the editor, shared drafts,
 reordering, removal, Save and Discard. Existing jobs need no data migration:
 `assignment_rules` defaults to an empty sequence.
+
+## Add checklist template item
+
+The automatic `add_checklist_template` handler activates a reusable job checklist
+immediately after its calling item. Configure it through **Add Checklist Item →
+Add checklist template**, select a template, update its inputs, and map the
+contexts declared on that template. The mapping belongs to this item; the input
+definitions belong to the template. The template does not need an exposed addition
+button or the optional additions module.
+
+For example, a template named `review` declaring a string input named `subject`
+can be invoked with:
+
+```yaml
+expand_review:
+  label: Add reference review
+  handler: add_checklist_template
+  handler_configuration:
+    template: review
+    context_mapping:
+      template_context:subject: checklist:entity.title.value
+```
+
+Items inside `review` consume `template_context:subject` through their own context
+mappings. Separate invocations can map different sources. Local outcome references
+inside each template resolve within that invocation, including nested invocations.
+Mappings resolve live values; they do not snapshot the task's input data.
+
+The expanded definitions are known before execution, allowing expected outcomes
+to be configured. Child identities use
+`<parent>__template__<template>__<local_item>`. Children become applicable only once
+the parent completes with its `template` outcome naming that template. Ordinary
+item conditions still apply. The existing executor commits completion and outcome
+together, records an attempt and history, and supports the usual inline/worker
+processing. Automatic children can finish in the same processing pass.
+
+Replaying or retrying an invocation reuses its child identities rather than adding
+another copy. Different calling items have independent children, outcomes and
+history. Tasks keep reading their named job version, including its dirty override,
+so fixes to unfinished template items remain visible without recreating the task.
+Changing a template or item machine name changes its identity.
+
+Required unmapped inputs block execution. Missing templates, recursive expansion,
+unknown mapping destinations and oversized expansion are rejected. Delegated
+children require local job execution approval before activation; each child also
+passes the normal execution authorization checks when it runs. This handler does
+not grant permissions supplied by a caller.
+
+This is one invocation per calling item. Repeated/looped invocations and collection
+mapping are future work. See `AddChecklistTemplateTest` for runnable examples of
+scope isolation, nesting, retries, authorization and named/dirty versions, and
+`TaskJobEditFormTest::testTemplateExpansionDraft` for configuration persistence.

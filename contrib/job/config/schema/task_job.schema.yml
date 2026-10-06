@@ -238,3 +238,16 @@ task_job.template_exposure:
         type: string
     condition:
       type: condition.plugin.[id]
+
+checklist_item_handler.add_checklist_template:
+  type: checklist_item_handler
+  label: 'Add checklist template'
+  mapping:
+    template:
+      type: string
+      label: 'Checklist template'
+    context_mapping:
+      type: sequence
+      label: 'Template input mapping'
+      sequence:
+        type: string

@@ -2,8 +2,10 @@
 
 namespace Drupal\task_job;
 
+use Drupal\checklist\ChecklistContextMapping;
+
 /**
- * Expands decision templates into stable, scoped item definitions.
+ * Expands invoked templates into stable, scoped item definitions.
  *
  * Definitions exist before a choice is made, so their expected outcomes can be
  * configured. Checklist activates work only when its branch requirements match.
@@ -54,19 +56,24 @@ final class JobChecklistExpansion {
         $item['derivation'] = ['requirements' => $requirements, 'scopes' => $scopes];
       }
       $result[$name] = $item;
-      if ($item['handler'] !== 'decision') {
+      $automatic = $item['handler'] === 'add_checklist_template';
+      if (!$automatic && $item['handler'] !== 'decision') {
         continue;
       }
-      foreach ($item['handler_configuration']['options'] ?? [] as $choice => $option) {
+      $branches = $automatic ? ['template' => $item['handler_configuration']] : ($item['handler_configuration']['options'] ?? []);
+      foreach ($branches as $choice => $option) {
         $template = $option['template'] ?? '';
-        if ($template === '') {
+        if ($template === '' && !$automatic) {
           continue;
         }
         if (!isset($templates[$template]) || in_array($template, $ancestors, TRUE)) {
           throw new \InvalidArgumentException(sprintf('Checklist template "%s" is missing or recursively included.', $template));
         }
+        if ($automatic && array_diff_key($option['context_mapping'] ?? [], ChecklistContextMapping::definitions($templates[$template]['context'] ?? []))) {
+          throw new \InvalidArgumentException('Template expansion can only map declared template inputs.');
+        }
         if (count($ancestors) >= 16) {
-          throw new \InvalidArgumentException('Decision template expansion exceeds the supported size.');
+          throw new \InvalidArgumentException('Checklist template expansion exceeds the supported size.');
         }
         // Include the choice and template in each identity. Collisions with
         // authored names are rejected instead of reusing unrelated work.
@@ -83,7 +90,7 @@ final class JobChecklistExpansion {
         ];
         self::append(
           $result, $children, $templates, $child_prefix,
-          $requirements + [$name => $choice],
+          $requirements + [$name => $automatic ? ['outcome' => 'template', 'value' => $template] : $choice],
           [...$scopes, $scope],
           [...$ancestors, $template],
         );

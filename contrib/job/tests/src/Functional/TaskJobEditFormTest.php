@@ -340,6 +340,44 @@ class TaskJobEditFormTest extends BrowserTestBase {
   }
 
   /**
+   * Template expansion is configured in the job draft with declared mappings.
+   */
+  public function testTemplateExpansionDraft(): void {
+    $job = $this->saved();
+    $job->set('checklist_templates', [
+      'review' => [
+        'label' => 'Review work',
+        'context' => ['target' => ['type' => 'entity:task', 'label' => 'Review target', 'required' => TRUE]],
+        'items' => [
+          'confirm' => ['label' => 'Confirm review', 'handler' => 'simply_checkable', 'handler_configuration' => []],
+        ],
+      ],
+    ])->save();
+    $this->drupalGet('/admin/config/task/job/follow_up/checklist/add/add_checklist_template');
+    $this->submitForm([
+      'name' => 'expand',
+      'label' => 'Add review work',
+      'plugin_configuration[template]' => 'review',
+    ], 'Update template inputs');
+    $this->submitForm([
+      'plugin_configuration[context_mapping][template_context:target]' => 'checklist:entity',
+    ], 'Add');
+    $this->assertSame([], $this->saved()->getChecklistItems());
+    $this->clickLink('Settings');
+    $this->clickLink('Checklist');
+    $this->clickLink('configure');
+    $this->assertSession()->fieldValueEquals('plugin_configuration[template]', 'review');
+    $this->assertSession()->fieldValueEquals('plugin_configuration[context_mapping][template_context:target]', 'checklist:entity');
+    $this->submitForm([], 'Update');
+    $this->clickLink('Checklist templates');
+    $this->clickLink('Review work');
+    $this->submitForm([], 'Remove template');
+    $this->assertSession()->pageTextContains('Remove this template from expansion items before deleting it.');
+    $this->submitForm([], 'Save');
+    $this->assertArrayHasKey('expand__template__review__confirm', $this->saved()->getExpandedChecklistItems());
+  }
+
+  /**
    * Decision template selection survives tab navigation and explicit saving.
    */
   public function testDecisionTemplateDraft(): void {

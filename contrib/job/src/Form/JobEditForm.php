@@ -813,6 +813,10 @@ class JobEditForm extends JobForm {
     }
     foreach ($definitions as $items) {
       foreach ($items as $item) {
+        if ($item['handler'] === 'add_checklist_template' && ($item['handler_configuration']['template'] ?? '') === $name) {
+          $form_state->setErrorByName('templates', $this->t('Remove this template from expansion items before deleting it.'));
+          return;
+        }
         if ($item['handler'] !== 'decision') {
           continue;
         }
