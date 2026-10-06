@@ -74,6 +74,21 @@ task_job.task_job.*:
           allow_addition:
             type: boolean
             label: 'Expose template as an addition'
+          context:
+            type: sequence
+            label: 'Template input definitions'
+            sequence:
+              type: task_job.context_definition
+          exposures:
+            type: sequence
+            label: 'Addition buttons'
+            sequence:
+              type: task_job.template_exposure
+          addition_context_mapping:
+            type: sequence
+            label: 'Addition context mapping'
+            sequence:
+              type: string
           addition_condition:
             type: condition.plugin.[id]
             label: 'Addition availability condition'
@@ -192,3 +207,34 @@ task_job.checklist_item:
     handler_configuration:
       type: checklist_item_handler.[%parent.handler]
       label: 'The handler configuration'
+
+task_job.context_definition:
+  type: mapping
+  label: 'Context definition'
+  mapping:
+    type:
+      type: string
+    label:
+      type: label
+    description:
+      type: text
+    required:
+      type: boolean
+    multiple:
+      type: boolean
+
+task_job.template_exposure:
+  type: mapping
+  label: 'Addition button'
+  mapping:
+    label:
+      type: label
+      label: 'Button label'
+    enabled:
+      type: boolean
+    context_mapping:
+      type: sequence
+      sequence:
+        type: string
+    condition:
+      type: condition.plugin.[id]

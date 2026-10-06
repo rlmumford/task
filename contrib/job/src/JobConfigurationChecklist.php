@@ -17,6 +17,11 @@ use Drupal\task_job\Plugin\ChecklistType\Job;
 class JobConfigurationChecklist extends Checklist {
 
   /**
+   * The template whose items are being configured.
+   */
+  public ?string $template = NULL;
+
+  /**
    * Create a checklist object from the job entity.
    *
    * @param \Drupal\task_job\JobInterface $job
@@ -49,9 +54,11 @@ class JobConfigurationChecklist extends Checklist {
     $job->setChecklistItems($items);
     $job->set('checklist_includes', []);
 
-    return new static(
+    $checklist = new static(
       $checklist_type_manager->createInstance('job', ['job' => $job])
     );
+    $checklist->template = $template;
+    return $checklist;
   }
 
   /**

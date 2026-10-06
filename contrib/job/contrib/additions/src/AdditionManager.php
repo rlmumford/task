@@ -78,8 +78,11 @@ class AdditionManager {
     [$task, $job, $checklist] = $this->prepare($task);
     $templates = [];
     foreach ($job->get('checklist_templates') ?: [] as $name => $definition) {
-      if (!empty($definition['allow_addition']) && !empty($definition['items']) && $this->available($checklist, $definition)) {
-        $templates[$name] = ['label' => trim($definition['addition_label'] ?? '') ?: $definition['label']];
+      foreach (AdditionDefinitions::exposures($definition) as $button => $exposure) {
+        if (!empty($exposure['enabled']) && !empty($definition['items']) && $this->available($checklist, $exposure)) {
+          $choice = $button === 'default' ? $name : $name . ':' . $button;
+          $templates[$choice] = ['label' => trim($exposure['label'] ?? '') ?: $definition['label']];
+        }
       }
     }
     return ['templates' => $templates, 'additions' => array_values($this->storage->forTask($task->uuid()))];
@@ -89,13 +92,14 @@ class AdditionManager {
    * Requires a match using current task, outcomes and caller contexts.
    */
   protected function available(ChecklistInterface $checklist, array $definition): bool {
-    return empty($definition['addition_condition']) || $this->conditions->evaluate($checklist, $definition['addition_condition']) === TRUE;
+    return empty($definition['condition']) || $this->conditions->evaluate($checklist, $definition['condition']) === TRUE;
   }
 
   /**
    * Adds an instance per request UUID without accepting executable config.
    */
   public function add(Task $task, string $template, string $request_id): array {
+    [$template, $button] = array_pad(explode(':', $template, 2), 2, 'default');
     if (!Uuid::isValid($request_id) || strtolower($request_id) !== $request_id) {
       throw new \InvalidArgumentException('Use a lowercase UUID as the addition request ID.');
     }
@@ -109,23 +113,24 @@ class AdditionManager {
       [$task, $job, $checklist] = $this->prepare($task);
       $existing = $this->storage->load($request_id);
       if ($existing) {
-        if ($existing['task_uuid'] !== $task->uuid() || $existing['template'] !== $template || (int) $existing['actor'] !== (int) $this->account->id()) {
+        if ($existing['task_uuid'] !== $task->uuid() || $existing['template'] !== $template || $existing['exposure'] !== $button || (int) $existing['actor'] !== (int) $this->account->id()) {
           throw new ConflictHttpException('The request ID belongs to a different addition.');
         }
         return $existing;
       }
       $definitions = $job->get('checklist_templates') ?: [];
-      if (empty($definitions[$template]['allow_addition']) || empty($definitions[$template]['items'])) {
+      $exposure = AdditionDefinitions::exposures($definitions[$template] ?? [])[$button] ?? [];
+      if (empty($exposure['enabled']) || empty($definitions[$template]['items'])) {
         throw new AccessDeniedHttpException('This template is not available for staff addition.');
       }
-      if (!$this->available($checklist, $definitions[$template])) {
+      if (!$this->available($checklist, $exposure)) {
         throw new AccessDeniedHttpException('This addition is not available for the current task.');
       }
       if (count($this->storage->forTask($task->uuid())) >= 100) {
         throw new ConflictHttpException('This task has reached its addition limit.');
       }
       // Grant approval is required before even queuing delegated child work.
-      $expanded = JobChecklistExpansion::instance($template, $definitions, AdditionDefinitions::prefix($request_id));
+      $expanded = JobChecklistExpansion::instance($template, $definitions, AdditionDefinitions::prefix($request_id), AdditionDefinitions::contextMapping($job, $template, $button));
       foreach ($expanded as $definition) {
         if (($definition['execution']['mode'] ?? 'self') === 'context') {
           $this->authorization->approvedGrant($job);
@@ -138,6 +143,7 @@ class AdditionManager {
         'job' => $job->getBaseJobId(),
         'job_version' => (string) $job->getVersion(),
         'template' => $template,
+        'exposure' => $button,
         'actor' => (int) $this->account->id(),
         'created' => $this->time->getCurrentTime(),
       ];

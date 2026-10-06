@@ -212,6 +212,10 @@ class DecisionChecklistTemplatesTest extends KernelTestBase {
     $job->addContextDefinition('subject', ContextDefinition::create('string')->setLabel('Subject')->setRequired(FALSE));
     $items = $job->getChecklistItems();
     $items['review']['handler_configuration']['options']['more']['context_mapping'] = ['task_context:subject' => 'checklist:entity.title.value'];
+    $templates = $job->get('checklist_templates');
+    $templates['documents']['context'] = ['subject' => ['type' => 'string', 'label' => 'Subject', 'required' => TRUE]];
+    $items['review']['handler_configuration']['options']['more']['context_mapping']['template_context:subject'] = 'checklist:entity.title.value';
+    $job->set('checklist_templates', $templates);
     $job->setChecklistItems($items);
     $job->save();
     $task = Task::create(['title' => 'Mapped title', 'job' => $job]);
@@ -220,6 +224,7 @@ class DecisionChecklistTemplatesTest extends KernelTestBase {
     $this->container->get('checklist.action_operation_dispatcher')->execute($checklist, 'review', 'choose', ['choice' => 'more']);
     $contexts = $this->container->get('checklist.context_collector')->collectRuntimeContexts($checklist, $checklist->getItem('review__more__documents__proof'));
     $this->assertSame('Mapped title', $contexts['task_context:subject']->getContextValue());
+    $this->assertSame('Mapped title', $contexts['template_context:subject']->getContextValue());
   }
 
   /**

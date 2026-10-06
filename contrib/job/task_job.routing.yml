@@ -188,3 +188,23 @@ task_job.assignment.configure:
     _entity_access: 'task_job.update'
   options:
     _admin_route: TRUE
+
+task_job.template_context.add:
+  path: '/admin/config/task/job/{task_job}/templates/{template}/context/add'
+  defaults:
+    _form: '\Drupal\task_job\Form\TemplateContextForm'
+    _title: 'Add template input'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE
+
+task_job.template_context.edit:
+  path: '/admin/config/task/job/{task_job}/templates/{template}/context/{context_name}/edit'
+  defaults:
+    _form: '\Drupal\task_job\Form\TemplateContextForm'
+    _title: 'Edit template input'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE

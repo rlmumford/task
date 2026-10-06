@@ -675,7 +675,7 @@ class JobEditForm extends JobForm {
    * Edits named definitions within the same job working copy.
    */
   protected function buildTemplates(array $form, FormStateInterface $form_state, array $ajax_attributes): array {
-    $form['template_help'] = ['#markup' => $this->t('Define named groups of checklist items here, then select them on the Checklist tab. Templates share this job version and its contexts. Item names share the checklist namespace.')];
+    $form['template_help'] = ['#markup' => $this->t('Define named groups of checklist items here, then select them on the Checklist tab. Templates share this job version and can declare their own inputs alongside normal task contexts.')];
     $name = $form_state->get('selected_template');
     if ($name !== NULL) {
       $templates = $this->entity->get('checklist_templates') ?: [];
@@ -686,13 +686,66 @@ class JobEditForm extends JobForm {
       $form['heading']['#value'] = $template['label'];
       $element = [
         '#type' => 'container',
-        'machine_name' => ['#type' => 'item', '#title' => $this->t('Machine name'), '#plain_text' => $name],
+        'machine_name' => [
+          '#type' => 'item',
+          '#title' => $this->t('Machine name'),
+          '#plain_text' => $name,
+          '#weight' => -4,
+        ],
         'label' => [
           '#type' => 'textfield',
           '#title' => $this->t('Template label'),
+          '#weight' => -3,
           '#default_value' => $template['label'],
           '#required' => TRUE,
         ],
+      ];
+      $element['context'] = [
+        '#type' => 'details',
+        '#title' => $this->t('Template contexts'),
+        '#open' => TRUE,
+        '#weight' => -2,
+        'table' => [
+          '#type' => 'table',
+          '#header' => [
+            $this->t('Input'),
+            ['data' => $this->t('Machine name'), 'class' => [RESPONSIVE_PRIORITY_LOW]],
+            ['data' => $this->t('Type'), 'class' => [RESPONSIVE_PRIORITY_LOW]],
+            ['data' => $this->t('Required'), 'class' => [RESPONSIVE_PRIORITY_LOW]],
+            ['data' => $this->t('Multiple'), 'class' => [RESPONSIVE_PRIORITY_LOW]],
+            $this->t('Operations'),
+          ],
+          '#empty' => $this->t('No template inputs defined.'),
+        ],
+      ];
+      $dialog = $ajax_attributes;
+      $dialog['attributes']['data-dialog-options'] = Json::encode(['width' => '550px']);
+      foreach ($template['context'] ?? [] as $key => $definition) {
+        $element['context']['table'][$key] = [
+          'label' => ['#plain_text' => $definition['label']],
+          'name' => ['#plain_text' => $key],
+          'type' => ['#plain_text' => $definition['type']],
+          'required' => ['#plain_text' => ($definition['required'] ?? TRUE) ? $this->t('Yes') : $this->t('No')],
+          'multiple' => ['#plain_text' => !empty($definition['multiple']) ? $this->t('Yes') : $this->t('No')],
+          'edit' => [
+            '#type' => 'link',
+            '#title' => $this->t('Edit'),
+            '#url' => Url::fromRoute('task_job.template_context.edit', [
+              'task_job' => $this->entity->id(),
+              'template' => $name,
+              'context_name' => $key,
+            ], $dialog),
+          ],
+        ];
+      }
+      $element['context']['add'] = [
+        '#type' => 'link',
+        '#title' => $this->t('Add template input'),
+        '#attributes' => ['class' => ['button']],
+        '#url' => Url::fromRoute('task_job.template_context.add', [
+          'task_job' => $this->entity->id(),
+          'template' => $name,
+        ], $dialog),
       ];
       $element = $this->buildChecklist($element, $form_state, $ajax_attributes, $name);
       $element['remove'] = [

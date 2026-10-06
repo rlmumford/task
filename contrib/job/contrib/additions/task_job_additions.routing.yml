@@ -1,0 +1,19 @@
+task_job_additions.exposure.add:
+  path: '/admin/config/task/job/{task_job}/templates/{template}/exposure/add'
+  defaults:
+    _form: '\Drupal\task_job_additions\Form\ExposureForm'
+    _title: 'Add addition button'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE
+
+task_job_additions.exposure.edit:
+  path: '/admin/config/task/job/{task_job}/templates/{template}/exposure/{exposure}/edit'
+  defaults:
+    _form: '\Drupal\task_job_additions\Form\ExposureForm'
+    _title: 'Edit addition button'
+  requirements:
+    _entity_access: 'task_job.update'
+  options:
+    _admin_route: TRUE

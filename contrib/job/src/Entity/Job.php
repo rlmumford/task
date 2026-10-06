@@ -507,6 +507,9 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
     }
     $conditions = array_filter(array_column($this->get('assignment_rules') ?: [], 'condition'));
     $conditions = array_merge($conditions, array_filter(array_column($this->get('checklist_templates') ?: [], 'addition_condition')));
+    foreach ($this->get('checklist_templates') ?: [] as $template) {
+      $conditions = array_merge($conditions, array_filter(array_column($template['exposures'] ?? [], 'condition')));
+    }
     foreach (\Drupal::service('checklist.condition_evaluator')->calculateDependencies($conditions) as $type => $names) {
       foreach ($names as $name) {
         $this->addDependency($type, $name);

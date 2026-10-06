@@ -347,6 +347,7 @@ class TaskJobEditFormTest extends BrowserTestBase {
     $job->set('checklist_templates', [
       'documents' => [
         'label' => 'Collect documents',
+        'context' => ['target' => ['type' => 'entity:task', 'label' => 'Document target', 'required' => TRUE]],
         'items' => [
           'request' => [
             'name' => 'request',
@@ -365,6 +366,10 @@ class TaskJobEditFormTest extends BrowserTestBase {
       'plugin_configuration[options][0][name]' => 'more',
       'plugin_configuration[options][0][label]' => 'More documents',
       'plugin_configuration[options][0][template]' => 'documents',
+    ], 'Update template inputs');
+    $this->assertSession()->fieldExists('plugin_configuration[options][0][context_mapping][template_context:target]');
+    $this->submitForm([
+      'plugin_configuration[options][0][context_mapping][template_context:target]' => 'checklist:entity',
     ], 'Add');
     $this->assertSession()->addressEquals('/admin/config/task/job/follow_up/edit');
     $this->assertSame([], $this->saved()->getChecklistItems());
@@ -372,6 +377,7 @@ class TaskJobEditFormTest extends BrowserTestBase {
     $this->clickLink('Checklist');
     $this->clickLink('configure');
     $this->assertSession()->fieldValueEquals('plugin_configuration[options][0][template]', 'documents');
+    $this->assertSession()->fieldValueEquals('plugin_configuration[options][0][context_mapping][template_context:target]', 'checklist:entity');
     $this->submitForm([], 'Update');
     $this->clickLink('Checklist templates');
     $this->clickLink('Collect documents');

@@ -22,7 +22,7 @@ final class JobChecklistExpansion {
   /**
    * Expands a separately recorded template instance with local outcome aliases.
    */
-  public static function instance(string $template, array $templates, string $prefix): array {
+  public static function instance(string $template, array $templates, string $prefix, array $context_mapping = []): array {
     if (!isset($templates[$template])) {
       return [];
     }
@@ -32,7 +32,12 @@ final class JobChecklistExpansion {
       $aliases[$name] = $prefix . $name;
     }
     $result = [];
-    self::append($result, $items, $templates, $prefix, [], [['aliases' => $aliases, 'context_mapping' => []]], [$template]);
+    $scope = [
+      'aliases' => $aliases,
+      'context_mapping' => $context_mapping,
+      'context_definitions' => $templates[$template]['context'] ?? [],
+    ];
+    self::append($result, $items, $templates, $prefix, [], [$scope], [$template]);
     return $result;
   }
 
@@ -71,7 +76,11 @@ final class JobChecklistExpansion {
         foreach (array_keys($children) as $child) {
           $aliases[$child] = $child_prefix . $child;
         }
-        $scope = ['aliases' => $aliases, 'context_mapping' => $option['context_mapping'] ?? []];
+        $scope = [
+          'aliases' => $aliases,
+          'context_mapping' => $option['context_mapping'] ?? [],
+          'context_definitions' => $templates[$template]['context'] ?? [],
+        ];
         self::append(
           $result, $children, $templates, $child_prefix,
           $requirements + [$name => $choice],

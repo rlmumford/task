@@ -38,3 +38,7 @@ services:
     arguments: ['@keyvalue', '@current_user', '@entity_type.manager', '@config.storage', '@task_job.version_resolver', '@checklist.context_collector', '@context.handler', '@uuid', '@datetime.time']
     tags:
       - { name: event_subscriber }
+  task_job.template_contexts:
+    class: Drupal\task_job\TemplateContexts
+    tags:
+      - { name: event_subscriber }

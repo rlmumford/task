@@ -160,3 +160,75 @@ stale task objects, dirty overrides, idempotent replay and existing work staying
 active after availability changes. Row refresh tests also verify that choices
 appear/disappear and that unchanged choices retain a stable refresh signature.
 See the [real UI walkthrough](../../../../../../../docs/screenshots/job-addition-availability/README.md).
+
+## Template inputs and addition buttons
+
+The **Template contexts** table summarises each template input: machine name,
+label, typed-data type, requiredness and cardinality. **Add template input** and
+**Edit** open an off-canvas form. Updates remain in the shared job draft until
+**Save**; removing an input also clears its addition button mappings. Items consume these as
+`template_context:<name>`. Normal `task_context:<name>` inputs remain available
+separately; declaring a template input does not change the job's contexts.
+
+The **Exposure** table lists addition buttons. **Add addition button** and **Edit**
+open an off-canvas form for the label, enabled state, availability condition and
+context mappings. Condition-selection rebuilds stay inside the same panel.
+**Update button** writes the working draft; the job’s **Save** commits it. Multiple buttons can invoke the
+same template with different inputs. Mappings use the standard Typed Data Plus
+assignment widget, including property/filter selectors and global providers.
+
+```yaml
+checklist_templates:
+  reference:
+    label: Reference check
+    context:
+      subject:
+        type: string
+        label: Reference subject
+        required: true
+        multiple: false
+    exposures:
+      default:
+        enabled: true
+        label: Check task title
+        context_mapping:
+          'template_context:subject': 'checklist:entity.title.value'
+      description:
+        enabled: true
+        label: Check task description
+        context_mapping:
+          'template_context:subject': 'checklist:entity.description.value'
+    items: # Handlers consume template_context:subject.
+```
+
+Discovery identifies the default button by the template name (`reference`) and
+other buttons as `template:button` (`reference:description`). Pass that discovery
+key as the existing API `template` value. Receipts record the template and button
+separately. Reusing a request UUID for a different button is a conflict.
+Disabling a button prevents new additions but keeps existing instances working.
+Existing single-button configuration remains readable and is converted when its
+template is saved in the editor; existing receipts acquire the `default` button
+identity through the database update.
+
+Mappings resolve in the enclosing task scope before local outcome aliases are
+installed. They apply to the addition and nested decision branches without
+changing host or sibling contexts. Decision choices own their own mappings into
+the selected template; use **Update template inputs** after selecting a template.
+A future expansion/looping item will likewise own its mappings, not the template.
+Looping is not implemented here.
+
+Selectors resolve current values on each iteration. A global current-user source
+means the account active during evaluation; use an explicit entity reference when
+identity must remain stable. Missing required inputs block the items, including
+handlers without their own context slots. Availability is evaluated against the
+parent task before the addition exists.
+
+Definitions and mappings belong to the named job version, including dirty
+corrections, and participate in its execution approval fingerprint. The API
+accepts no caller-supplied mappings or execution-policy overrides. Editing the
+configuration never authorizes a different executor by itself.
+
+Kernel coverage includes independent buttons, missing required inputs, scoped
+nested branches, live selectors, global providers, pinned/dirty versions and
+delegated execution. Browser coverage verifies declaring inputs, native mapping
+widgets, multiple buttons, draft tab navigation and explicit Save.

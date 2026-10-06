@@ -8,10 +8,11 @@
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Form\SubformState;
+use Drupal\Component\Serialization\Json;
+use Drupal\Core\Url;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\Form\JobEditForm;
-use Drupal\task_job\JobConfigurationChecklist;
+use Drupal\task_job_additions\AdditionDefinitions;
 
 /**
  * Implements hook_form_alter().
@@ -22,68 +23,59 @@ function task_job_additions_form_alter(array &$form, FormStateInterface $form_st
   if (!$object instanceof JobEditForm || !$name || !isset($form['templates'][$name])) {
     return;
   }
-  $templates = $object->getEntity()->get('checklist_templates') ?: [];
-  $form['templates'][$name]['allow_addition'] = [
-    '#type' => 'checkbox',
-    '#title' => t('Expose template as an addition'),
-    '#description' => t('Users also need permission to add checklist templates and edit the task. Each addition gets independent items and uses this task’s job version and contexts.'),
-    '#default_value' => !empty($templates[$name]['allow_addition']),
-    '#weight' => -2,
+  $template = ($object->getEntity()->get('checklist_templates') ?: [])[$name];
+  $options = [
+    'attributes' => [
+      'class' => ['use-ajax'],
+      'data-dialog-type' => 'dialog',
+      'data-dialog-renderer' => 'off_canvas',
+      'data-dialog-options' => Json::encode(['width' => '650px']),
+    ],
   ];
-  $form['templates'][$name]['addition_label'] = [
-    '#type' => 'textfield',
-    '#title' => t('Addition label'),
-    '#description' => t('Shown in Add work. Leave blank to use the template label.'),
-    '#default_value' => $templates[$name]['addition_label'] ?? '',
-    '#weight' => -1,
-  ];
-  $checklist = JobConfigurationChecklist::createFromJob($object->getEntity());
-  $contexts = \Drupal::service('checklist.context_collector')->collectConfigContexts($checklist);
-  $form['templates'][$name]['addition_condition'] = \Drupal::service('checklist.condition_configuration_form')->build([
+  $section = [
     '#type' => 'details',
-    '#title' => t('Addition availability'),
-    '#description' => t('Offer this addition only when the condition matches the current checklist. Missing required context values prevent a match. Existing additions are unaffected.'),
-    '#open' => !empty($templates[$name]['addition_condition']),
-    '#parents' => ['templates', $name, 'addition_condition'],
+    '#title' => t('Exposure'),
+    '#open' => TRUE,
     '#weight' => -1,
-  ], $form_state, $templates[$name]['addition_condition'] ?? [], $contexts);
-  array_unshift($form['#validate'], 'task_job_additions_validate_job');
-  $form['#entity_builders'][] = 'task_job_additions_build_job';
-}
-
-/**
- * Validates condition plugin settings before the job builds its working entity.
- */
-function task_job_additions_validate_job(array &$form, FormStateInterface $form_state): void {
-  if (($form_state->getTriggeringElement()['#limit_validation_errors'] ?? NULL) === []) {
-    return;
+    'table' => [
+      '#type' => 'table',
+      '#header' => [
+        t('Addition label'),
+        ['data' => t('Machine name'), 'class' => [RESPONSIVE_PRIORITY_LOW]],
+        ['data' => t('Enabled'), 'class' => [RESPONSIVE_PRIORITY_LOW]],
+        ['data' => t('Availability'), 'class' => [RESPONSIVE_PRIORITY_LOW]],
+        t('Operations'),
+      ],
+      '#empty' => t('No addition buttons configured.'),
+    ],
+  ];
+  foreach (AdditionDefinitions::exposures($template) as $key => $configuration) {
+    $section['table'][$key] = [
+      'label' => ['#plain_text' => ($configuration['label'] ?? '') ?: $template['label']],
+      'name' => ['#plain_text' => $key],
+      'enabled' => ['#plain_text' => !empty($configuration['enabled']) ? t('Yes') : t('No')],
+      'condition' => ['#plain_text' => empty($configuration['condition']) ? t('Always') : t('Conditional')],
+      'edit' => [
+        '#type' => 'link',
+        '#title' => t('Edit'),
+        '#url' => Url::fromRoute('task_job_additions.exposure.edit', [
+          'task_job' => $object->getEntity()->id(),
+          'template' => $name,
+          'exposure' => $key,
+        ], $options),
+      ],
+    ];
   }
-  $name = $form_state->get('selected_template');
-  $element = &$form['templates'][$name]['addition_condition'];
-  $state = SubformState::createForSubform($element, $form, $form_state);
-  $condition = \Drupal::service('checklist.condition_configuration_form')->configuration($element, $state);
-  // Use an empty array to distinguish clearing a rule from an untouched tab.
-  $form_state->set('addition_condition_configuration', $condition ?? []);
-}
-
-/**
- * Keeps the addition option in the job's working draft until explicit Save.
- */
-function task_job_additions_build_job($entity_type, EntityInterface $entity, array &$form, FormStateInterface $form_state): void {
-  $templates = $entity->get('checklist_templates') ?: [];
-  foreach ($form_state->getValue('templates', []) as $name => $values) {
-    if (isset($templates[$name]) && isset($form['templates'][$name]['allow_addition'])) {
-      $templates[$name]['allow_addition'] = !empty($values['allow_addition']);
-      $templates[$name]['addition_label'] = trim($values['addition_label'] ?? '');
-      if ($form_state->has('addition_condition_configuration')) {
-        unset($templates[$name]['addition_condition']);
-        if ($condition = $form_state->get('addition_condition_configuration')) {
-          $templates[$name]['addition_condition'] = $condition;
-        }
-      }
-    }
-  }
-  $entity->set('checklist_templates', $templates);
+  $section['add'] = [
+    '#type' => 'link',
+    '#title' => t('Add addition button'),
+    '#attributes' => ['class' => ['button']],
+    '#url' => Url::fromRoute('task_job_additions.exposure.add', [
+      'task_job' => $object->getEntity()->id(),
+      'template' => $name,
+    ], $options),
+  ];
+  $form['templates'][$name]['exposures'] = $section;
 }
 
 /**

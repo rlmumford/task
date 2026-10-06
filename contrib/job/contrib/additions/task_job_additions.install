@@ -18,6 +18,7 @@ function task_job_additions_schema() {
         'job' => ['type' => 'varchar_ascii', 'length' => 255, 'not null' => TRUE],
         'job_version' => ['type' => 'varchar_ascii', 'length' => 128, 'not null' => TRUE, 'default' => ''],
         'template' => ['type' => 'varchar_ascii', 'length' => 128, 'not null' => TRUE],
+        'exposure' => ['type' => 'varchar_ascii', 'length' => 128, 'not null' => TRUE, 'default' => 'default'],
         'actor' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE],
         'created' => ['type' => 'int', 'size' => 'big', 'not null' => TRUE],
       ],
@@ -25,4 +26,15 @@ function task_job_additions_schema() {
       'indexes' => ['task' => ['task_uuid']],
     ],
   ];
+}
+
+/**
+ * Records which exposure button instantiated a checklist template.
+ */
+function task_job_additions_update_10001() {
+  $schema = \Drupal::database()->schema();
+  $definition = task_job_additions_schema()['task_job_checklist_addition']['fields']['exposure'];
+  if (!$schema->fieldExists('task_job_checklist_addition', 'exposure')) {
+    $schema->addField('task_job_checklist_addition', 'exposure', $definition);
+  }
 }
