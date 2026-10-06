@@ -237,7 +237,76 @@ children require local job execution approval before activation; each child also
 passes the normal execution authorization checks when it runs. This handler does
 not grant permissions supplied by a caller.
 
-This is one invocation per calling item. Repeated/looped invocations and collection
-mapping are future work. See `AddChecklistTemplateTest` for runnable examples of
+By default this is one invocation per calling item. Collection repetition is
+configured as described below. See `AddChecklistTemplateTest` for runnable examples of
 scope isolation, nesting, retries, authorization and named/dirty versions, and
 `TaskJobEditFormTest::testTemplateExpansionDraft` for configuration persistence.
+
+### Collections and combinations through ordinary context mappings
+
+Map a collection into a single-value template input to invoke that template once
+per member. There is no separate loop input or repeat setting. Cardinality is
+inferred from the mapped typed-data definition, including filtered selectors.
+
+For example, a Review Document template can declare single-value `document` and
+`reviewer` inputs, then be invoked with:
+
+```yaml
+review_documents:
+  label: Prepare document reviews
+  handler: add_checklist_template
+  handler_configuration:
+    template: review_document
+    context_mapping:
+      template_context:document: task_context:documents
+      template_context:reviewer: task_context:reviewers
+```
+
+Two documents and three reviewers produce all six document/reviewer combinations.
+A scalar mapping contributes one value without creating another dimension. An input
+explicitly declared multiple-value receives its whole collection and does not
+multiply invocations. If any iterated collection is empty, no child work is created.
+
+Each invocation has independent contexts, outcomes and history. Its template can
+contain an ordinary manual Review Document item, decisions, forms or resource
+configuration. A title such as
+`Review Document: {{template_context:document.filename.value}} — {{template_context:reviewer}}`
+shows which combination the item concerns.
+
+The configuration UI identifies inferred collection mappings as **For each … as
+Document**, **For each … as Reviewer**, and so on. Changing the selected template
+refreshes its inputs automatically. The rebuild-only Update template inputs button
+uses `js-hide`, remaining available when JavaScript is disabled. Neither refresh
+commits the job draft.
+
+Successful expansion atomically stores the participating input names in `iterated`,
+each frozen collection in a typed `members_<input>` outcome, and its child items.
+Each collection is stored once, not once per combination. Entity values use Typed
+Data Reference's entity references; they are not serialized entity snapshots.
+Source reordering, additions or removals cannot retarget existing work. Entity
+fields remain live. Non-iterated mappings, including whole-collection inputs,
+continue to resolve their normal current values.
+
+Child names include their parent's name and their position in the **recorded**
+Cartesian product: `<parent>__member_<position>__<template>__<item>`. Duplicate
+members produce distinct invocations. Without any iterated inputs the original
+single-invocation namespace is retained. Child definitions remain available in the
+authoring catalog; runtime children materialize under the parent's atomic result.
+This avoids creating every possible child before the collections are known.
+
+Replay reuses identities. A failure before commit leaves no partial child work;
+a fresh retry can read corrected source data. The completed parent retains its
+invocation configuration; child configuration still follows the task's named job
+version and dirty override. Use new item names or job versions when changing the
+shape of already-executed invocations. Nested invocations are supported.
+
+Each collection is limited to 1,000 members, the Cartesian product to 1,000
+combinations, and the expanded checklist to 1,000 items including other work.
+These checks happen before children are saved. Unsaved or inaccessible entity
+members are rejected. Existing execution authorization and worker processing apply.
+No new receipt table, module or endpoint is required.
+
+`AddChecklistTemplateTest` covers Cartesian products, whole-collection inputs,
+empty sets, entity references, frozen membership, nesting, rollback/retry and
+named/dirty versions. The draft browser test covers mapping persistence. See the
+[real UI captures](../../../../../docs/screenshots/checklist-template-collection/README.md).

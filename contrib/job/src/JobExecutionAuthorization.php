@@ -176,7 +176,7 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
     if (!$job) {
       return;
     }
-    $definition = $type->getItemDefinitions($task, $job)[$event->item->getName()] ?? NULL;
+    $definition = $type->getItemDefinitions($task, $job, $event->checklist->getKey())[$event->item->getName()] ?? NULL;
     if (!$definition || ($definition['execution']['mode'] ?? 'self') !== 'context') {
       return;
     }

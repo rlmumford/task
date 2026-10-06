@@ -42,3 +42,7 @@ services:
     class: Drupal\task_job\TemplateContexts
     tags:
       - { name: event_subscriber }
+
+  task_job.template_input_cardinality:
+    class: Drupal\task_job\TemplateInputCardinality
+    arguments: ['@typed_data_plus.data_fetcher', '@context.repository']

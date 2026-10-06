@@ -10,3 +10,15 @@ editor:
     - core/drupal.dialog.ajax
     - core/jquery
     - core/once
+
+template-invocation:
+  css:
+    theme:
+      css/template-invocation.css: {}
+  js:
+    js/template-invocation.js: {}
+  dependencies:
+    - core/drupal
+    - core/drupal.ajax
+    - core/jquery
+    - core/once

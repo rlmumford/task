@@ -37,10 +37,31 @@ class JobChecklist extends Checklist {
   }
 
   /**
+   * Refreshes persisted collection children after inline parent completion.
+   */
+  public function setItem(string $name, ChecklistItemInterface $item) {
+    parent::setItem($name, $item);
+    if ($item->isComplete() && $item->get('handler')->id === 'add_checklist_template') {
+      foreach ($this->getType()->itemStorage()->loadByProperties([
+        'checklist_type' => $this->getType()->getPluginId(),
+        'checklist.target_id' => $this->getEntity()->id(),
+        'checklist.checklist_key' => $this->getKey(),
+      ]) as $child) {
+        if (!isset($this->items[$child->getName()])) {
+          $child->get('checklist')->entity = $this->getEntity();
+          $this->items[$child->getName()] = $child;
+        }
+      }
+      $this->definitionsCurrent = FALSE;
+    }
+    return $this;
+  }
+
+  /**
    * {@inheritdoc}
    */
   protected function getDefaultItems(): array {
-    return $this->getType()->getDefaultItemsForTask($this->getEntity());
+    return $this->getType()->getDefaultItemsForTask($this->getEntity(), $this->getKey());
   }
 
   /**

@@ -10,6 +10,7 @@ use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\Plugin\PluginWithFormsTrait;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\JobChecklist;
+use Drupal\task_job\JobTemplateCollection;
 use Drupal\task_job\Event\JobChecklistDefinitionsEvent;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\JobVersionResolverInterface;
@@ -127,13 +128,32 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
   /**
    * Resolves definitions for a particular task without copying job config.
    */
-  public function getItemDefinitions(Task $task, ?JobInterface $job = NULL): array {
+  public function getItemDefinitions(Task $task, ?JobInterface $job = NULL, string $key = 'checklist'): array {
     $job ??= $this->getJob();
     if (!$job) {
       return [];
     }
     $event = new JobChecklistDefinitionsEvent($task, $job, $job->getExpandedChecklistItems());
     $this->eventDispatcher->dispatch($event, JobChecklistDefinitionsEvent::NAME);
+    $invocations = [];
+    $has_invocations = array_filter($event->definitions, static fn(array $definition) => $definition['handler'] === 'add_checklist_template');
+    if (!$task->isNew() && $has_invocations) {
+      foreach ($this->itemStorage()->loadByProperties([
+        'checklist_type' => $this->getPluginId(),
+        'checklist.target_id' => $task->id(),
+        'checklist.checklist_key' => $key,
+      ]) as $item) {
+        if ($item->isComplete() && $item->get('handler')->id === 'add_checklist_template') {
+          $configuration = $item->getHandler()->getConfiguration();
+          $counts = [];
+          foreach ($item->get('outcomes')->get('iterated')->getValue() as $input) {
+            $counts[$input] = count($item->get('outcomes')->get('members_' . $input));
+          }
+          $invocations[$item->getName()] = ['configuration' => $configuration, 'counts' => $counts];
+        }
+      }
+    }
+    $event->definitions = JobTemplateCollection::expand($event->definitions, $job->get('checklist_templates') ?: [], $invocations);
     if (count($event->definitions) > 1000) {
       throw new \InvalidArgumentException('The task checklist exceeds 1,000 definitions.');
     }
@@ -143,11 +163,11 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
   /**
    * Builds host-specific items, preserving legacy configuration overrides.
    */
-  public function getDefaultItemsForTask(Task $task): array {
+  public function getDefaultItemsForTask(Task $task, string $key = 'checklist'): array {
     if (isset($this->configuration['default_items'])) {
       return $this->getDefaultItems();
     }
-    return $this->createItems($this->getItemDefinitions($task));
+    return $this->createItems($this->getItemDefinitions($task, key: $key));
   }
 
   /**

@@ -109,10 +109,9 @@ class AddChecklistTemplateTest extends KernelTestBase {
     $job->save();
     $task = $this->task($job);
     $checklist = $task->checklist->checklist;
-    $this->assertSame(['expand', 'expand__template__review__consume', 'second', 'second__template__review__consume'], array_keys($checklist->getOrderedItems()));
-    $child = $checklist->getItem('expand__template__review__consume');
-    $this->assertFalse($checklist->isItemActive($child));
+    $this->assertSame(['expand', 'second'], array_keys($checklist->getOrderedItems()));
     $this->assertTrue($this->container->get('checklist.processor')->process($checklist));
+    $child = $checklist->getItem('expand__template__review__consume');
     $this->assertTrue($checklist->isItemActive($child));
     $this->assertSame([['Title input', NULL], ['Description input', NULL]], $this->container->get('state')->get('checklist_context_test.runs'));
     $parent = $checklist->getItem('expand');
@@ -159,6 +158,7 @@ class AddChecklistTemplateTest extends KernelTestBase {
     }
     $checklist = $task->checklist->checklist;
     $this->container->get('checklist.item_executor')->submit($checklist->getItem('expand'));
+    $checklist = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id())->checklist->checklist;
     $child_uuid = $checklist->getItem('expand__template__review__consume')->uuid();
     $seven = $versions->createVersion($job, '7');
     $templates = $seven->get('checklist_templates');
@@ -178,6 +178,45 @@ class AddChecklistTemplateTest extends KernelTestBase {
   }
 
   /**
+   * Collection children follow named versions and dirty fixes without rekeying.
+   */
+  public function testCollectionVersionedDefinitions(): void {
+    $job = $this->job();
+    $job->set('context', ['documents' => ['type' => 'string', 'label' => 'Documents', 'multiple' => TRUE]]);
+    $invocation = $this->invocation('task_context:documents');
+    $job->setChecklistItems(['expand' => $invocation]);
+    $job->save();
+    $versions = $this->container->get('task_job.version_resolver');
+    $six = $versions->createVersion($job, '6');
+    $six->save();
+    $task = Task::create(['title' => 'Title input', 'job' => $job, 'job_version' => '6']);
+    $task->get('context')->set('documents', ['Passport']);
+    $task->save();
+    foreach ($task->checklist->checklist->getItems() as $item) {
+      $item->save();
+    }
+    $checklist = $task->checklist->checklist;
+    $this->container->get('checklist.item_executor')->submit($checklist->getItem('expand'));
+    $checklist = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id())->checklist->checklist;
+    $child_uuid = $checklist->getItem('expand__member_0__review__consume')->uuid();
+    $seven = $versions->createVersion($job, '7');
+    $templates = $seven->get('checklist_templates');
+    $templates['review']['items']['consume']['label'] = 'Version seven';
+    $seven->set('checklist_templates', $templates)->save();
+    $storage = $this->container->get('entity_type.manager')->getStorage('task');
+    $this->assertSame('Review subject', $storage->loadUnchanged($task->id())->checklist->checklist->getItem('expand__member_0__review__consume')->get('title')->value);
+    $dirty = $versions->createDirtyVersion($six);
+    $templates = $dirty->get('checklist_templates');
+    $templates['review']['items']['consume']['label'] = 'Corrected review';
+    $dirty->set('checklist_templates', $templates)->save();
+    $fresh = $storage->loadUnchanged($task->id())->checklist->checklist;
+    $child = $fresh->getItem('expand__member_0__review__consume');
+    $this->assertSame('Corrected review', $child->get('title')->value);
+    $this->assertSame($child_uuid, $child->uuid());
+    $this->assertTrue($fresh->isItemActive($child));
+  }
+
+  /**
    * Missing required inputs block the parent before it records an attempt.
    */
   public function testRequiredInput(): void {
@@ -189,7 +228,7 @@ class AddChecklistTemplateTest extends KernelTestBase {
     $task = $this->task($job);
     $checklist = $task->checklist->checklist;
     $this->assertNull($this->container->get('checklist.item_executor')->submit($checklist->getItem('expand')));
-    $this->assertFalse($checklist->isItemActive($checklist->getItem('expand__template__review__consume')));
+    $this->assertFalse($checklist->hasItem('expand__template__review__consume'));
   }
 
   /**
@@ -249,7 +288,7 @@ class AddChecklistTemplateTest extends KernelTestBase {
     }
     catch (AccessDeniedHttpException) {
       $fresh = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id())->checklist->checklist;
-      $this->assertFalse($fresh->isItemActive($fresh->getItem('expand__template__review__consume')));
+      $this->assertFalse($fresh->hasItem('expand__template__review__consume'));
     }
     $failed = $this->container->get('checklist.attempt_journal')->latest($parent);
     $this->assertSame(ChecklistAttempt::FAILED, $failed->status);
@@ -261,6 +300,187 @@ class AddChecklistTemplateTest extends KernelTestBase {
     $fresh = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id())->checklist->checklist;
     $this->assertCount(2, $fresh->getItems());
     $this->assertTrue($fresh->isItemActive($fresh->getItem('expand__template__review__consume')));
+  }
+
+  /**
+   * Collection membership is frozen and children consume independent values.
+   */
+  public function testCollectionMembership(): void {
+    $job = $this->job();
+    $job->set('context', ['documents' => ['type' => 'string', 'label' => 'Documents', 'multiple' => TRUE]]);
+    $invocation = $this->invocation('task_context:documents');
+    $job->setChecklistItems(['expand' => $invocation]);
+    $job->save();
+    $task = Task::create(['title' => 'Review documents', 'job' => $job]);
+    $task->get('context')->set('documents', ['Passport', 'Bank statement']);
+    $task->save();
+    foreach ($task->checklist->checklist->getItems() as $item) {
+      $item->save();
+    }
+    $checklist = $task->checklist->checklist;
+    $this->assertCount(1, $checklist->getItems());
+    $this->assertTrue($this->container->get('checklist.processor')->process($checklist));
+    $this->assertSame([['Passport', NULL], ['Bank statement', NULL]], $this->container->get('state')->get('checklist_context_test.runs'));
+    $this->assertSame(['expand', 'expand__member_0__review__consume', 'expand__member_1__review__consume'], array_keys($checklist->getOrderedItems()));
+    $uuid = $checklist->getItem('expand__member_0__review__consume')->uuid();
+    $task->get('context')->set('documents', ['New document', 'Bank statement', 'Passport']);
+    $task->save();
+    $fresh = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id())->checklist->checklist;
+    $this->assertCount(3, $fresh->getItems());
+    $this->assertSame($uuid, $fresh->getItem('expand__member_0__review__consume')->uuid());
+    $this->assertSame(['Passport', 'Bank statement'], $fresh->getItem('expand')->get('outcomes')->get('members_subject')->getValue());
+    $this->container->get('checklist.item_executor')->submit($fresh->getItem('expand'));
+    $this->assertCount(3, $fresh->getItems());
+  }
+
+  /**
+   * Empty sets finish without children; entity sets retain references.
+   */
+  public function testEntityCollection(): void {
+    $job = $this->job();
+    $job->set('context', ['documents' => ['type' => 'entity:task', 'label' => 'Documents', 'multiple' => TRUE]]);
+    $templates = $job->get('checklist_templates');
+    $templates['review']['context']['subject']['type'] = 'entity:task';
+    $templates['review']['items']['consume']['handler_configuration']['context_mapping']['value'] = 'template_context:subject.title.value';
+    $job->set('checklist_templates', $templates);
+    $invocation = $this->invocation('task_context:documents');
+    $job->setChecklistItems(['expand' => $invocation]);
+    $job->save();
+    $document = Task::create([
+      'title' => 'Passport',
+      'description' => 'A document stand-in for the generic entity collection test.',
+    ]);
+    $document->save();
+    $task = Task::create(['title' => 'Document review', 'job' => $job]);
+    $task->get('context')->set('documents', [$document]);
+    $task->save();
+    $checklist = $task->checklist->checklist;
+    $parent = $checklist->getItem('expand');
+    $parent->save();
+    $this->container->get('checklist.item_executor')->submit($parent);
+    $document->set('title', 'Updated passport')->save();
+    $fresh = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id())->checklist->checklist;
+    $this->assertSame($document->id(), $fresh->getItem('expand')->get('outcomes')->get('members_subject')->get(0)->getValue()->id());
+    $this->assertTrue($this->container->get('checklist.processor')->process($fresh));
+    $this->assertSame([['Updated passport', NULL]], $this->container->get('state')->get('checklist_context_test.runs'));
+    $empty = Task::create(['title' => 'No documents', 'job' => $job]);
+    $empty->get('context')->set('documents', []);
+    $empty->save();
+    $empty_checklist = $empty->checklist->checklist;
+    $empty_checklist->getItem('expand')->save();
+    $this->assertTrue($this->container->get('checklist.processor')->process($empty_checklist));
+    $this->assertCount(1, $empty_checklist->getItems());
+  }
+
+  /**
+   * A failed oversized expansion rolls back every child and can retry safely.
+   */
+  public function testCollectionRollback(): void {
+    $job = $this->job();
+    $job->set('context', ['documents' => ['type' => 'string', 'label' => 'Documents', 'multiple' => TRUE]]);
+    $invocation = $this->invocation('task_context:documents');
+    $job->setChecklistItems(['expand' => $invocation]);
+    $templates = $job->get('checklist_templates');
+    $templates['review']['items']['second'] = $templates['review']['items']['consume'];
+    $job->set('checklist_templates', $templates)->save();
+    $task = Task::create(['title' => 'Too many reviews', 'job' => $job]);
+    $task->get('context')->set('documents', array_fill(0, 501, 'Document'));
+    $task->save();
+    $parent = $task->checklist->checklist->getItem('expand');
+    $parent->save();
+    $executor = $this->container->get('checklist.item_executor');
+    try {
+      $executor->submit($parent);
+      $this->fail('Oversized expansion must fail.');
+    }
+    catch (\InvalidArgumentException $exception) {
+      $this->assertStringContainsString('1,000', $exception->getMessage());
+    }
+    $storage = $this->container->get('entity_type.manager')->getStorage('task');
+    $fresh_task = $storage->loadUnchanged($task->id());
+    $this->assertCount(1, $fresh_task->checklist->checklist->getItems());
+    $parent = $fresh_task->checklist->checklist->getItem('expand');
+    $failed = $this->container->get('checklist.attempt_journal')->latest($parent);
+    $this->assertSame(ChecklistAttempt::FAILED, $failed->status);
+    $fresh_task->get('context')->set('documents', ['One document']);
+    $fresh_task->save();
+    $parent = $storage->loadUnchanged($task->id())->checklist->checklist->getItem('expand');
+    $this->assertSame(ChecklistAttempt::SUCCEEDED, $executor->retry($parent, $failed, ChecklistAttempt::FRESH)->status);
+    $this->assertCount(3, $storage->loadUnchanged($task->id())->checklist->checklist->getItems());
+  }
+
+  /**
+   * Nested collection invocations keep separate identities and local inputs.
+   */
+  public function testNestedCollections(): void {
+    $job = $this->job();
+    $job->set('context', ['documents' => ['type' => 'string', 'label' => 'Documents', 'multiple' => TRUE]]);
+    $invocation = $this->invocation('task_context:documents');
+    $job->setChecklistItems(['expand' => $invocation]);
+    $templates = $job->get('checklist_templates');
+    $templates['inner'] = $templates['review'];
+    $nested = $invocation;
+    $nested['handler_configuration']['template'] = 'inner';
+    $templates['review']['items'] = ['nested' => $nested];
+    $job->set('checklist_templates', $templates)->save();
+    $task = Task::create(['title' => 'Nested collections', 'job' => $job]);
+    $task->get('context')->set('documents', ['A', 'B']);
+    $task->save();
+    $checklist = $task->checklist->checklist;
+    $checklist->getItem('expand')->save();
+    $this->assertTrue($this->container->get('checklist.processor')->process($checklist));
+    $this->assertCount(7, $checklist->getItems());
+    $this->assertSame([['A', NULL], ['B', NULL], ['A', NULL], ['B', NULL]], $this->container->get('state')->get('checklist_context_test.runs'));
+  }
+
+  /**
+   * Single inputs expand Cartesian products; list inputs remain whole lists.
+   */
+  public function testCartesianMappings(): void {
+    $job = $this->job();
+    $job->set('context', [
+      'documents' => ['type' => 'string', 'label' => 'Documents', 'multiple' => TRUE],
+      'reviewers' => ['type' => 'string', 'label' => 'Reviewers', 'multiple' => TRUE],
+    ]);
+    $invocation = $this->invocation('task_context:documents');
+    $invocation['handler_configuration']['context_mapping'] += [
+      'template_context:reviewer' => 'task_context:reviewers',
+      'template_context:all_documents' => 'task_context:documents',
+    ];
+    $job->setChecklistItems(['expand' => $invocation]);
+    $templates = $job->get('checklist_templates');
+    $templates['review']['context']['reviewer'] = ['type' => 'string', 'label' => 'Reviewer'];
+    $templates['review']['context']['all_documents'] = [
+      'type' => 'string',
+      'label' => 'All documents',
+      'multiple' => TRUE,
+    ];
+    $templates['review']['items']['consume']['handler_configuration']['context_mapping']['optional'] = 'template_context:reviewer';
+    $job->set('checklist_templates', $templates)->save();
+    $task = Task::create(['title' => 'Every document and reviewer', 'job' => $job]);
+    $task->get('context')->set('documents', ['Passport', 'Statement']);
+    $task->get('context')->set('reviewers', ['Alex', 'Blair', 'Casey']);
+    $task->save();
+    $checklist = $task->checklist->checklist;
+    $checklist->getItem('expand')->save();
+    $this->assertTrue($this->container->get('checklist.processor')->process($checklist));
+    $this->assertCount(7, $checklist->getItems());
+    $this->assertSame([
+      ['Passport', 'Alex'], ['Passport', 'Blair'], ['Passport', 'Casey'],
+      ['Statement', 'Alex'], ['Statement', 'Blair'], ['Statement', 'Casey'],
+    ], $this->container->get('state')->get('checklist_context_test.runs'));
+    $child = $checklist->getItem('expand__member_3__review__consume');
+    $contexts = $this->container->get('checklist.context_collector')->collectRuntimeContexts($checklist, $child);
+    $this->assertSame(['Passport', 'Statement'], $contexts['template_context:all_documents']->getContextValue());
+    $this->assertSame(['subject', 'reviewer'], $checklist->getItem('expand')->get('outcomes')->get('iterated')->getValue());
+    $empty = Task::create(['title' => 'No reviewers', 'job' => $job]);
+    $empty->get('context')->set('documents', ['Passport']);
+    $empty->get('context')->set('reviewers', []);
+    $empty->save();
+    $empty_checklist = $empty->checklist->checklist;
+    $empty_checklist->getItem('expand')->save();
+    $this->assertTrue($this->container->get('checklist.processor')->process($empty_checklist));
+    $this->assertCount(1, $empty_checklist->getItems());
   }
 
 }
