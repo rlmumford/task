@@ -67,3 +67,17 @@ Kernel coverage includes preview safety, job/effect/met/terminal selection,
 transaction rollback, repeat delivery and activation by the replacement. The real
 job editor is also exercised for action switching, event switching, saving and
 reloading mappings. See `docs/screenshots/task-trigger-actions` at repository root.
+
+## Explicit occurrences
+
+Sources which are not entity field transitions may implement
+`OccurrenceTriggerInterface`. Their `matches()` returns FALSE; trusted source code
+calls `task_dependency.manager::recordOccurrence($id, $entity)` inside its database
+transaction after establishing the event facts. It records only existing matching
+subscriptions and preserves the ordinary identity, locking, history and readiness
+queue behavior. Do not expose this method as an unguarded user operation.
+
+The job-event deriver gives these sources their declared context without an
+invented `original` entity. The source integration invokes
+`dependency_event:SOURCE_ID` with those same contexts; job conditions and actions
+still apply. Document Task uses this for completion of required document reviews.

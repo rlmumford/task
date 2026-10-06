@@ -172,6 +172,28 @@ class DependencyManager {
    * Records matching occurrences inside the source entity save transaction.
    */
   public function observe(EntityInterface $entity): void {
+    $this->matchDependencies($entity);
+  }
+
+  /**
+   * Records a source-verified occurrence inside the source transaction.
+   *
+   * This is a trusted integration API, not a user action endpoint. It never
+   * infers completion from mutable data or satisfies a future subscription.
+   */
+  public function recordOccurrence(string $trigger, EntityInterface $entity): void {
+    $matcher = $this->triggers->createInstance($trigger);
+    if (!$matcher instanceof OccurrenceTriggerInterface) {
+      throw new \InvalidArgumentException('This trigger requires entity transition matching.');
+    }
+    $matcher->validateTarget($entity);
+    $this->matchDependencies($entity, $trigger);
+  }
+
+  /**
+   * Matches indexed subscribers under their registration locks.
+   */
+  protected function matchDependencies(EntityInterface $entity, ?string $occurrence_trigger = NULL): void {
     if (!$entity instanceof FieldableEntityInterface || !$entity->uuid()
       || ($entity instanceof ContentEntityInterface && !$entity->isDefaultRevision())) {
       return;
@@ -186,8 +208,11 @@ class DependencyManager {
         if ($dependency->get('met')->value || $dependency->get('bindings')->first()->entity_uuid !== $entity->uuid()) {
           continue;
         }
+        if ($occurrence_trigger !== NULL && $dependency->get('trigger')->value !== $occurrence_trigger) {
+          continue;
+        }
         $matcher = $this->triggers->createInstance($dependency->get('trigger')->value, $dependency->get('configuration')->first()?->getValue() ?? []);
-        if ($matcher->matches($entity, $entity->original ?? NULL)) {
+        if ($occurrence_trigger !== NULL || $matcher->matches($entity, $entity->original ?? NULL)) {
           $dependency->set('met', TRUE)->set('occurrence', $occurrence)->set('met_at', $this->time->getCurrentTime())->save();
           $this->workflow->record($dependency, 'matched', ['occurrence' => $occurrence]);
           $this->workflow->request($dependency->get('owner')->value);

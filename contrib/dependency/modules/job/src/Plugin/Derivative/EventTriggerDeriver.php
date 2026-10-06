@@ -5,6 +5,7 @@ namespace Drupal\task_dependency_job\Plugin\Derivative;
 use Drupal\Component\Plugin\Derivative\DeriverBase;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\task_dependency\TriggerManager;
+use Drupal\task_dependency\OccurrenceTriggerInterface;
 use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -36,9 +37,9 @@ class EventTriggerDeriver extends DeriverBase implements ContainerDeriverInterfa
         'label' => $definition['label'],
         'event' => $id,
         'event_context' => $name,
-        'context_definitions' => $definition['context_definitions'] + [
+        'context_definitions' => $definition['context_definitions'] + (is_a($definition['class'], OccurrenceTriggerInterface::class, TRUE) ? [] : [
           'original' => clone $context,
-        ],
+        ]),
       ] + $base_plugin_definition;
     }
     return $this->derivatives;

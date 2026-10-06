@@ -4,6 +4,7 @@ namespace Drupal\task_dependency_job\Plugin\JobTrigger;
 
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\task_dependency\TriggerManager;
+use Drupal\task_dependency\OccurrenceTriggerInterface;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -59,7 +60,7 @@ class DependencyEvent extends JobTriggerBase {
    */
   public function access(?CacheableMetadata $cache_metadata = NULL) {
     $matcher = $this->events->createInstance($this->pluginDefinition['event'], $this->configuration['event_configuration'] ?? []);
-    return $matcher->matches($this->getContextValue($this->pluginDefinition['event_context']), $this->getContextValue('original')) && parent::access($cache_metadata);
+    return ($matcher instanceof OccurrenceTriggerInterface || $matcher->matches($this->getContextValue($this->pluginDefinition['event_context']), $this->getContextValue('original'))) && parent::access($cache_metadata);
   }
 
 }
