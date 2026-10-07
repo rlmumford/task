@@ -2,9 +2,8 @@
 
 The job editor has separate **Checklist**, **Triggers**, **Contexts**,
 **Checklist templates**, **Assignment rules**, and **Settings** tabs. Only the selected tab is built and
-rendered. Settings includes the label, description and resources. Assignment
-currently exposes the existing default rule; richer assignment rules are follow-up
-work. Named checklist templates support static inclusion in this slice.
+rendered. Settings includes the label, description and resources. Assignment rules
+are ordered, with an unconditional last rule providing any default assignee.
 
 ## Routes and local tasks
 
@@ -134,8 +133,9 @@ On saving an unassigned task, evaluate rules in their stored order. The first
 matching rule wins. Resolve its assignee through the core `context.handler`
 service, extended by Typed Data Plus. Assign only an active, authenticated user.
 If the matched rule's account is missing or blocked, leave the task unassigned;
-do not run another rule or the fallback. If no rule matches, retain the existing
-`assignment` policy: service manager, task creator, or leave unassigned.
+do not run another rule. If no rule matches, leave the task unassigned. A final
+rule with no condition supplies a default assignee; there is no separate fallback
+setting or implicit service-manager assignment for jobs.
 Existing task assignments and accounts selected by higher-priority subscribers
 are preserved. Clearing an assignee allows selection again on the next save;
 editing a job does not reassign already assigned tasks.
@@ -152,7 +152,6 @@ job during configuration; runtime values come from that task. Global providers
 remain available through `@provider:context` mappings. For example:
 
 ```yaml
-assignment: service_manager
 assignment_rules:
   urgent_review:
     label: Urgent work to the reviewer
@@ -183,12 +182,14 @@ invalid plugin configuration or invalid selectors raise an error rather than
 silently falling back to a different person. Condition plugin dependencies are
 included in the job's configuration dependencies.
 
-`AssignmentRulesTest` covers real task saves, first-match order, default fallback,
+`AssignmentRulesTest` covers real task saves, first-match order, unconditional final rules,
 blocked/missing accounts, explicit assignments, core conditions, groups, global
 contexts, pinned versions, dirty overrides and unsaved authoring contexts.
 `TaskJobEditFormTest::testAssignmentRuleEditor` covers the editor, shared drafts,
-reordering, removal, Save and Discard. Existing jobs need no data migration:
-`assignment_rules` defaults to an empty sequence.
+reordering, removal, Save and Discard. `task_job_update_8006()` converts saved
+legacy creator/service-manager policies into final unconditional rules, including
+named versions and dirty overlays. Legacy unassigned policies become no rule.
+New jobs start with no assignment rules. Re-export updated configuration.
 
 ## Add checklist template item
 

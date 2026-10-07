@@ -72,7 +72,9 @@ class TaskIntegrationTest extends KernelTestBase {
       ],
     ]);
     $job->save();
-    $this->assertSame('service_manager', $job->get('assignment'));
+    $job->set('assignment_rules', [
+      ['label' => 'Service manager', 'context_mapping' => ['assignee' => 'task.service.entity.manager.entity']],
+    ])->save();
     $this->assertTrue($this->container->has('service.task_assignee_subscriber'));
     $this->assertEquals($manager->id(), $service->manager->target_id);
     $task = Task::create(['title' => 'Review request', 'job' => $job, 'service' => $service]);
@@ -191,7 +193,13 @@ class TaskIntegrationTest extends KernelTestBase {
     $creator->save();
     $explicit = User::create(['name' => 'explicit', 'status' => 1]);
     $explicit->save();
-    $job = Job::create(['id' => 'assign', 'label' => 'Assign', 'assignment' => 'creator']);
+    $job = Job::create([
+      'id' => 'assign',
+      'label' => 'Assign',
+      'assignment_rules' => [
+        ['label' => 'Creator', 'context_mapping' => ['assignee' => 'task.creator.entity']],
+      ],
+    ]);
     $job->save();
     $task = Task::create(['title' => 'Automatic', 'job' => $job, 'creator' => $creator]);
     $task->save();
@@ -199,8 +207,11 @@ class TaskIntegrationTest extends KernelTestBase {
     $task = Task::create(['title' => 'Explicit', 'job' => $job, 'creator' => $creator, 'assignee' => $explicit]);
     $task->save();
     $this->assertEquals($explicit->id(), $task->assignee->target_id);
-    $job->set('assignment', 'unassigned')->save();
-    $task = Task::create(['title' => 'Unassigned', 'job' => $job, 'creator' => $creator]);
+    $job->set('assignment_rules', [])->save();
+    ServiceType::create(['id' => 'assignment', 'label' => 'Assignment'])->save();
+    $service = Service::create(['type' => 'assignment', 'label' => 'Managed service', 'manager' => $creator]);
+    $service->save();
+    $task = Task::create(['title' => 'Unassigned', 'job' => $job, 'creator' => $creator, 'service' => $service]);
     $task->save();
     $this->assertTrue($task->assignee->isEmpty());
   }

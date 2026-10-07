@@ -10,7 +10,7 @@ use Drupal\user\Entity\User;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Applies a job's assignment rule before the service-level fallback.
+ * Applies the job's ordered rules without an implicit fallback.
  */
 class AssignmentSubscriber implements EventSubscriberInterface {
 
@@ -53,17 +53,8 @@ class AssignmentSubscriber implements EventSubscriberInterface {
       $event->stopPropagation();
       return;
     }
-    if ($job->get('assignment') === 'service_manager') {
-      return;
-    }
-    if ($job->get('assignment') === 'creator') {
-      $creator = $task->creator->entity;
-      if ($creator && $creator->isAuthenticated() && $creator->isActive()) {
-        $event->setAssignee($creator);
-      }
-    }
-    // "Unassigned" (and an unknown rule) must not fall through to the service
-    // manager. Other policies can be supplied by higher-priority subscribers.
+    // Jobs own assignment through their rules. An unconditional last rule
+    // supplies a default; no match must not invoke an implicit service policy.
     $event->stopPropagation();
   }
 

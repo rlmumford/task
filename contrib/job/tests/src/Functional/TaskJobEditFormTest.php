@@ -93,7 +93,10 @@ class TaskJobEditFormTest extends BrowserTestBase {
       'context[_add_new][type]' => 'entity:task',
     ], 'Add');
     $this->switchTab([], 'Assignment rules');
-    $this->switchTab(['assignment' => 'creator'], 'Checklist');
+    $this->assertSession()->fieldNotExists('assignment');
+    $this->clickLink('Add assignment rule');
+    $this->submitForm(['label' => 'Creator', 'context_mapping[assignee]' => 'task.creator.entity'], 'Add rule');
+    $this->switchTab([], 'Checklist');
     $this->clickLink('Add Checklist Item');
     $this->clickLink('Simple Checkbox');
     $this->submitForm(['name' => 'review', 'label' => 'Review replacement work'], 'Add');
@@ -107,7 +110,7 @@ class TaskJobEditFormTest extends BrowserTestBase {
     $this->assertSession()->pageTextContains('The job has been saved.');
     $job = $this->saved();
     $this->assertSame('Draft label', $job->label());
-    $this->assertSame('creator', $job->get('assignment'));
+    $this->assertSame('task.creator.entity', array_values($job->get('assignment_rules'))[0]['context_mapping']['assignee']);
     $this->assertSame('entity:task', $job->getContextDefinition('document')->getDataType());
     $this->assertSame('Review replacement work', $job->getChecklistItems()['review']['label']);
     $this->assertSame('invalidate', $job->getTriggersConfiguration()['replacement']['action']['configuration']['dependency_action']);

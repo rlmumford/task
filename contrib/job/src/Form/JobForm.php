@@ -43,18 +43,6 @@ class JobForm extends EntityForm {
       '#description' => $this->t('A description for the job. This will appear on the page when a user is selecting which task template to use. Task documentation should be included in the task description or in the checklist.'),
     ];
 
-    $form['assignment'] = [
-      '#type' => 'select',
-      '#title' => $this->t('Default assignment'),
-      '#options' => [
-        'service_manager' => $this->t('Service manager'),
-        'creator' => $this->t('Task creator'),
-        'unassigned' => $this->t('Leave unassigned'),
-      ],
-      '#default_value' => $this->entity->get('assignment') ?: 'service_manager',
-      '#description' => $this->t('Applies when the task has no explicit assignee. Only active user accounts are assigned.'),
-    ];
-
     return $form;
   }
 

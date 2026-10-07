@@ -5,6 +5,7 @@
  * Install and update hooks for the task job module.
  */
 
+use Drupal\task_job\Entity\Job;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
@@ -275,4 +276,39 @@ function task_job_update_8005() {
     ->setDisplayConfigurable('form', TRUE);
   $storage_definition_listener->onFieldStorageDefinitionCreate($definition);
   $definition_listener->onFieldDefinitionCreate($definition);
+}
+
+/**
+ * Converts legacy fallback settings into final unconditional assignment rules.
+ */
+function task_job_update_8006() {
+  $storage = \Drupal::service('config.storage');
+  foreach (array_merge([''], $storage->getAllCollectionNames()) as $collection) {
+    $collection_storage = $storage->createCollection($collection);
+    foreach ($collection_storage->listAll('task_job.task_job.') as $name) {
+      $data = $collection_storage->read($name);
+      if (!array_key_exists('assignment', $data)) {
+        continue;
+      }
+      $selector = [
+        'creator' => 'task.creator.entity',
+        'service_manager' => 'task.service.entity.manager.entity',
+      ][$data['assignment']] ?? NULL;
+      if ($selector) {
+        $key = 'default_assignment';
+        while (isset($data['assignment_rules'][$key])) {
+          $key .= '_';
+        }
+        $data['assignment_rules'][$key] = [
+          'label' => $data['assignment'] === 'creator' ? 'Task creator' : 'Service manager',
+          'context_mapping' => ['assignee' => $selector],
+        ];
+      }
+      unset($data['assignment']);
+      $data['active_hash'] = Job::definitionHash($data);
+      $collection_storage->write($name, $data);
+    }
+  }
+  \Drupal::configFactory()->reset();
+  \Drupal::entityTypeManager()->getStorage('task_job')->resetCache();
 }

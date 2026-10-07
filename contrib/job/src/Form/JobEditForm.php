@@ -204,13 +204,10 @@ class JobEditForm extends JobForm {
     ];
     if ($section === 'settings') {
       $form = parent::form($form, $form_state);
-      unset($form['assignment']);
       $form['id'] = ['#type' => 'item', '#title' => $this->t('Machine name'), '#plain_text' => $this->entity->id()];
       $form = $this->buildResources($form, $form_state, $ajax_attributes);
     }
     elseif ($section === 'assignment') {
-      $settings = parent::form([], $form_state);
-      $form['assignment'] = $settings['assignment'];
       $form = $this->buildAssignmentRules($form, $form_state, $ajax_attributes);
     }
     else {
@@ -229,12 +226,10 @@ class JobEditForm extends JobForm {
    * Lists rules in evaluation order, using the existing draft/dialog workflow.
    */
   protected function buildAssignmentRules(array $form, FormStateInterface $form_state, array $ajax_attributes): array {
-    $form['assignment']['#title'] = $this->t('Fallback assignment');
-    $form['assignment']['#description'] = $this->t('Used only when no assignment rule matches. Explicit task assignees are never replaced.');
     $form['assignment_help'] = [
       '#type' => 'html_tag',
       '#tag' => 'p',
-      '#value' => $this->t('Rules run from top to bottom when an unassigned task is saved. The first matching rule wins. Drag rows to change their order.'),
+      '#value' => $this->t('Rules run from top to bottom when an unassigned task is saved. The first matching rule wins. Add a final rule with no condition for a default assignee. If no rule matches, the task stays unassigned. Explicit assignees are preserved. Drag rows to change their order.'),
     ];
     $form['add_assignment_rule'] = [
       '#type' => 'link',
@@ -245,7 +240,7 @@ class JobEditForm extends JobForm {
     $form['assignment_rules'] = [
       '#type' => 'table',
       '#header' => [$this->t('Rule'), $this->t('Assignee context'), $this->t('Operations'), $this->t('Order')],
-      '#empty' => $this->t('No assignment rules. The fallback assignment applies.'),
+      '#empty' => $this->t('No assignment rules. Tasks remain unassigned unless an assignee is explicitly supplied.'),
       '#tabledrag' => [['action' => 'order', 'relationship' => 'sibling', 'group' => 'assignment-rule-weight']],
     ];
     foreach (array_keys($this->entity->get('assignment_rules') ?: []) as $weight => $key) {
@@ -1021,7 +1016,7 @@ class JobEditForm extends JobForm {
   protected function copyFormValuesToEntity(EntityInterface $entity, array $form, FormStateInterface $form_state) {
     // Only the visible tab may change these values. Navigation controls and
     // incomplete trigger form arrays are not entity properties.
-    foreach (['label', 'description', 'assignment'] as $property) {
+    foreach (['label', 'description'] as $property) {
       if (isset($form[$property]) && $form_state->hasValue($property)) {
         $entity->set($property, $form_state->getValue($property));
       }

@@ -11,9 +11,6 @@ task_job.task_job.*:
     description:
       type: text
       label: 'Description'
-    assignment:
-      type: string
-      label: 'Default assignment rule'
     assignment_rules:
       type: sequence
       label: 'Ordered assignment rules'

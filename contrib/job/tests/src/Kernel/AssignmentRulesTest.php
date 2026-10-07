@@ -49,7 +49,7 @@ class AssignmentRulesTest extends KernelTestBase {
     $creator->save();
     $reviewer = User::create(['name' => 'Reviewer', 'status' => 1]);
     $reviewer->save();
-    $job = Job::create(['id' => 'review', 'label' => 'Review', 'assignment' => 'creator']);
+    $job = Job::create(['id' => 'review', 'label' => 'Review']);
     $job->addContextDefinition('reviewer', ContextDefinition::create('entity:user')->setLabel('Reviewer')->setRequired(FALSE));
     $special = [
       'label' => 'Urgent reviewer',
@@ -80,7 +80,7 @@ class AssignmentRulesTest extends KernelTestBase {
     $job->set('assignment_rules', ['urgent' => $special])->save();
     $task = Task::create(['title' => 'Ordinary', 'job' => $job, 'creator' => $creator]);
     $task->save();
-    $this->assertEquals($creator->id(), $task->assignee->target_id, 'No match uses default assignment.');
+    $this->assertTrue($task->assignee->isEmpty(), 'No match leaves the task unassigned.');
     $task = Task::create(['title' => 'Urgent', 'job' => $job, 'creator' => $creator]);
     $task->save();
     $this->assertTrue($task->assignee->isEmpty(), 'Matched rule with missing account does not fall through.');
@@ -101,7 +101,7 @@ class AssignmentRulesTest extends KernelTestBase {
   public function testVersionedAssignment(): void {
     $creator = User::create(['name' => 'Creator', 'status' => 1]);
     $creator->save();
-    $job = Job::create(['id' => 'versions', 'label' => 'Versions', 'assignment' => 'unassigned']);
+    $job = Job::create(['id' => 'versions', 'label' => 'Versions']);
     $job->save();
     $draft = clone $job;
     $draft->addContextDefinition('draft_owner', ContextDefinition::create('entity:user')->setLabel('Draft owner'));
@@ -137,7 +137,7 @@ class AssignmentRulesTest extends KernelTestBase {
     $account = User::create(['name' => 'Operator', 'status' => 1]);
     $account->save();
     $this->container->get('current_user')->setAccount($account);
-    $job = Job::create(['id' => 'providers', 'label' => 'Providers', 'assignment' => 'unassigned']);
+    $job = Job::create(['id' => 'providers', 'label' => 'Providers']);
     $job->addContextDefinition('reviewer', ContextDefinition::create('entity:user')->setLabel('Reviewer')->setRequired(FALSE));
     $job->set('assignment_rules', [
       'reviewer' => [
@@ -172,6 +172,44 @@ class AssignmentRulesTest extends KernelTestBase {
     $this->assertEquals($reviewer->id(), $task->assignee->target_id);
     $this->expectException(PluginNotFoundException::class);
     $this->container->get('task_job.assignment_rules')->matches(['condition' => ['id' => 'missing_condition']], []);
+  }
+
+  /**
+   * Legacy defaults become final rules without replacing existing rule keys.
+   */
+  public function testLegacyAssignmentUpgrade(): void {
+    $storage = $this->container->get('config.storage');
+    $existing = [
+      'label' => 'Existing',
+      'condition' => ['id' => 'condition_constant:false'],
+      'context_mapping' => ['assignee' => 'task.creator.entity'],
+    ];
+    foreach (['legacy' => 'creator', 'legacy--v6' => 'service_manager', 'legacy--v6-dirty' => 'unassigned'] as $id => $policy) {
+      $storage->write('task_job.task_job.' . $id, [
+        'id' => $id,
+        'assignment' => $policy,
+        'assignment_rules' => ['default_assignment' => $existing],
+      ]);
+    }
+    $this->container->get('module_handler')->loadInclude('task_job', 'install');
+    task_job_update_8006();
+    foreach ([
+      'legacy' => 'task.creator.entity',
+      'legacy--v6' => 'task.service.entity.manager.entity',
+      'legacy--v6-dirty' => NULL,
+    ] as $id => $selector) {
+      $data = $storage->read('task_job.task_job.' . $id);
+      $this->assertArrayNotHasKey('assignment', $data);
+      $this->assertSame($existing, $data['assignment_rules']['default_assignment']);
+      $this->assertCount($selector ? 2 : 1, $data['assignment_rules']);
+      if ($selector) {
+        $rule = $data['assignment_rules']['default_assignment_'];
+        $this->assertSame($selector, $rule['context_mapping']['assignee']);
+        $this->assertArrayNotHasKey('condition', $rule);
+      }
+    }
+    task_job_update_8006();
+    $this->assertCount(2, $storage->read('task_job.task_job.legacy')['assignment_rules']);
   }
 
 }

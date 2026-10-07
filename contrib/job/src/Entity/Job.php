@@ -39,7 +39,6 @@ use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
  *     "checklist_templates",
  *     "checklist_includes",
  *     "triggers",
- *     "assignment",
  *     "assignment_rules",
  *     "version",
  *     "version_of",
@@ -217,14 +216,7 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
   }
 
   /**
-   * The default assignment rule; explicit task assignees take precedence.
-   *
-   * @var string
-   */
-  protected $assignment = 'service_manager';
-
-  /**
-   * Ordered conditional assignments, evaluated before the default policy.
+   * Ordered assignments; a rule without conditions can supply the default.
    *
    * @var array
    */
