@@ -248,3 +248,14 @@ checklist_item_handler.add_checklist_template:
       label: 'Template input mapping'
       sequence:
         type: string
+
+entity_template.component.plugin.task_context.data_select:
+  type: entity_template.component.plugin
+  label: 'Select task context data'
+  mapping:
+    task_context:
+      type: string
+      label: 'Task context'
+    selector:
+      type: string
+      label: 'Data selector'
