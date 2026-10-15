@@ -32,24 +32,24 @@ task_job.task_job.*:
       type: sequence
       label: 'Task Contexts'
       sequence:
-        - type: mapping
-          label: 'Task Context'
-          mapping:
-            type:
-              type: string
-              label: 'The data type'
-            label:
-              type: label
-              label: 'The context label'
-            required:
-              type: boolean
-              label: 'Whether this context is required.'
-            multiple:
-              type: boolean
-              label: 'Whether this context can have multiple values.'
-            description:
-              type: string
-              label: 'A description of the context'
+        type: mapping
+        label: 'Task Context'
+        mapping:
+          type:
+            type: string
+            label: 'The data type'
+          label:
+            type: label
+            label: 'The context label'
+          required:
+            type: boolean
+            label: 'Whether this context is required.'
+          multiple:
+            type: boolean
+            label: 'Whether this context can have multiple values.'
+          description:
+            type: string
+            label: 'A description of the context'
     resources:
       type: sequence
       sequence:
@@ -127,8 +127,8 @@ task_job.task_job.*:
       type: sequence
       label: 'Triggers'
       sequence:
-        - type: task_job.trigger.[id]
-          label: 'Trigger'
+        type: task_job.trigger.[id]
+        label: 'Trigger'
 
 task_job.trigger:
   type: mapping
