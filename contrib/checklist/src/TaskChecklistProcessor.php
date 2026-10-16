@@ -3,6 +3,8 @@
 namespace Drupal\task_checklist;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\checklist\ChecklistResolver;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\task\TaskReadiness;
 use Drupal\task\Entity\Task;
@@ -62,6 +64,10 @@ class TaskChecklistProcessor implements TaskChecklistProcessorInterface {
     $task = $this->entityTypeManager->getStorage('task')->loadUnchanged($task->id());
     if (!$task) {
       return;
+    }
+    if ($task->getEntityType()->get('checklist_separate_execution_access')
+      && (!$task->access('view') || !$task->access(ChecklistResolver::executionOperation($task)))) {
+      throw new AccessDeniedHttpException('The task cannot be processed.');
     }
     $readiness = $this->readiness->evaluate($task);
     if ($readiness->state === 'invalid') {

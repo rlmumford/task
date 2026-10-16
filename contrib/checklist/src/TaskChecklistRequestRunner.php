@@ -3,6 +3,7 @@
 namespace Drupal\task_checklist;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\checklist\ChecklistResolver;
 use Drupal\Core\Lock\LockBackendInterface;
 use Drupal\Core\Session\AccountSwitcherInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -51,7 +52,7 @@ class TaskChecklistRequestRunner {
       $switched = TRUE;
       $this->entityTypeManager->getAccessControlHandler('task')->resetCache();
       $this->entityTypeManager->getAccessControlHandler('checklist_item')->resetCache();
-      if ($task->access('view') && $task->access('update') && $task->checklist->access('view') && $task->checklist->access('edit')) {
+      if ($task->access('view') && $task->access(ChecklistResolver::executionOperation($task)) && $task->checklist->access('view') && $task->checklist->access('edit')) {
         $this->processor->processTask($task);
       }
       $this->storage->acknowledge($message);
