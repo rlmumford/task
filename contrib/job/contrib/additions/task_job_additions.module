@@ -5,11 +5,11 @@
  * Authoring and task workspace integration for explicitly available additions.
  */
 
+use Drupal\task_job\JobEditor;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Component\Serialization\Json;
-use Drupal\Core\Url;
 use Drupal\task\Entity\Task;
 use Drupal\task_job\Form\JobEditForm;
 use Drupal\task_job_additions\AdditionDefinitions;
@@ -23,7 +23,7 @@ function task_job_additions_form_alter(array &$form, FormStateInterface $form_st
   if (!$object instanceof JobEditForm || !$name || !isset($form['templates'][$name])) {
     return;
   }
-  $template = ($object->getEntity()->get('checklist_templates') ?: [])[$name];
+  $template = ($object->getEntity()->getDefinitionValue('checklist_templates') ?: [])[$name];
   $options = [
     'attributes' => [
       'class' => ['use-ajax'],
@@ -58,7 +58,7 @@ function task_job_additions_form_alter(array &$form, FormStateInterface $form_st
       'edit' => [
         '#type' => 'link',
         '#title' => t('Edit'),
-        '#url' => Url::fromRoute('task_job_additions.exposure.edit', [
+        '#url' => JobEditor::url($object->getEntity(), 'task_job_additions.exposure.edit', [
           'task_job' => $object->getEntity()->id(),
           'template' => $name,
           'exposure' => $key,
@@ -70,7 +70,7 @@ function task_job_additions_form_alter(array &$form, FormStateInterface $form_st
     '#type' => 'link',
     '#title' => t('Add addition button'),
     '#attributes' => ['class' => ['button']],
-    '#url' => Url::fromRoute('task_job_additions.exposure.add', [
+    '#url' => JobEditor::url($object->getEntity(), 'task_job_additions.exposure.add', [
       'task_job' => $object->getEntity()->id(),
       'template' => $name,
     ], $options),

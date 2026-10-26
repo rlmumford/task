@@ -4,7 +4,6 @@ namespace Drupal\task_job;
 
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Url;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -35,12 +34,12 @@ class JobTemplateLocalTasks {
       // The form reports the lock; do not expose another owner's draft tabs.
       return;
     }
-    foreach ($job->get('checklist_templates') ?: [] as $name => $template) {
+    foreach ($job->getDefinitionValue('checklist_templates') ?: [] as $name => $template) {
       $data['tabs'][1]['task_job.template.' . $name] = [
         '#theme' => 'menu_local_task',
         '#link' => [
           'title' => $template['label'],
-          'url' => Url::fromRoute('entity.task_job.edit_template', ['task_job' => $job->id(), 'template' => $name]),
+          'url' => JobEditor::url($job, 'entity.task_job.edit_template', ['task_job' => $job->id(), 'template' => $name]),
           'localized_options' => ['attributes' => ['data-task-job-section' => 'templates']],
         ],
         '#active' => $this->routeMatch->getParameter('template') === $name,

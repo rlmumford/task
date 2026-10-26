@@ -111,7 +111,7 @@ class JobRemoveResourceForm extends FormBase {
     $uuid = $form_state->get('resource_uuid');
     $resources = $job->getResourcesCollection()->getConfiguration();
     unset($resources[$uuid]);
-    $job->set('resources', $resources);
+    $job->setDefinitionValue('resources', $resources);
     $job->getResourcesCollection()->setConfiguration($job->getResourcesConfiguration());
 
     $this->tempstoreRepository->set($job);

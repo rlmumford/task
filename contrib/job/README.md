@@ -174,8 +174,8 @@ directly. Current user means the
 account performing the save, including a worker's execution account, so use a
 stable task/job context when assignment must not depend on the caller.
 
-A task with `job_version` resolves that version's saved dirty overlay for both
-assignment rules and task-context definitions. Without `job_version`, the existing
+A task with `job.version` resolves that version's saved dirty overlay for both
+assignment rules and task-context definitions. Without `job.version`, the existing
 direct job-reference behavior is retained. Unsaved job-editor drafts are not used
 for live task assignment. Missing required condition inputs mean no match;
 invalid plugin configuration or invalid selectors raise an error rather than
@@ -311,3 +311,61 @@ No new receipt table, module or endpoint is required.
 empty sets, entity references, frozen membership, nesting, rollback/retry and
 named/dirty versions. The draft browser test covers mapping persistence. See the
 [real UI captures](../../../../../docs/screenshots/checklist-template-collection/README.md).
+
+## Content job providers
+
+`JobInterface` extends `EntityInterface`, allowing a module to supply a content
+entity alongside exported `task_job` configuration. `JobDefinitionTrait` supplies
+the common checklist, template, context, trigger and resource behavior. Providers
+implement `getDefinitionValue()`/`setDefinitionValue()` for their own storage,
+`getTaskValues()` for authoritative task references, and
+`getTaskQueryConditions()` for task lookups.
+
+Tasks have one single-value `job` field of type `task_job_reference`, containing
+`target_type`, `target_id`, and `version`. `version` is a named configuration
+version for `task_job`, or a saved revision ID for a revisionable content job.
+The computed `job.entity` property resolves that exact reference. There are no
+separate content-job or revision fields on tasks.
+
+Runtime consumers use `task_job.resolver->resolve($task)`. It verifies that the
+entity implements `JobInterface`, checks the saved identity, and loads the named
+version or pinned revision. Providers implement `hook_task_job_reference_validate()`
+to reject invalid ownership; they cannot substitute another definition. Saved
+content-job references are immutable. Providers must preserve referenced revisions.
+The checklist uses the task reference rather than selecting a second job from its
+serialized plugin configuration. Configuration jobs retain their existing
+named-version, dirty-overlay and unversioned latest-definition behavior.
+
+Assign a `JobInterface` object to `job`, or use an explicit reference:
+
+```php
+$task->set('job', [
+  'target_type' => 'organization_job',
+  'target_id' => (string) $job->id(),
+  'version' => (string) $job->getRevisionId(),
+]);
+```
+
+A scalar `job` assignment remains shorthand for a configuration job. The old
+`job_version` task field is removed: callers now use `job.version`. Queries must
+include both `job.target_type` and `job.target_id`; `getTaskQueryConditions()`
+provides these conditions. IDs can overlap between providers. Update 8007 copies
+existing configuration references and versions before removing the old columns.
+Legacy versioned configuration IDs are normalized into a base ID and selector.
+Run database updates before using the new runtime on an existing installation.
+Unsaved job objects are available only for new-task editor previews; persisted
+tasks always resolve their stored definition selector.
+
+The `task_job_triggers` alter hook receives the selected trigger instances, event
+plugin ID and explicit context values before execution. Providers may replace
+core triggers with scoped definitions. The `task_job_selection` alter hook receives
+the manual job list and its cache metadata; `task_job_manual_job` resolves or
+rejects the effective definition when a manual creation route is visited.
+
+`JobTaskBuilder::forJob()` binds the actual definition, avoiding global plugin
+derivatives for tenant data. Editor links use `JobEditor::url()` and the entity
+type's `task_job_route_prefix` metadata. Providers supply equivalent routes with
+the `task_job` parameter converted to their entity type and appropriate entity
+access requirements. Draft and nested blueprint keys include the entity type.
+Delegated execution approval for revisionable jobs is keyed by entity type, ID
+and revision; authoring does not bypass the separate authorization permission.

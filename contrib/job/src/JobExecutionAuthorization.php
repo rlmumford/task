@@ -8,6 +8,8 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\checklist\Event\ChecklistExecutionAuthorizationEvent;
 use Drupal\checklist\Execution\ChecklistExecutionAuthorization;
 use Drupal\Core\Config\StorageInterface;
+use Drupal\Core\Config\Entity\ConfigEntityInterface;
+use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\Plugin\Context\ContextHandlerInterface;
@@ -30,12 +32,21 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
     protected AccountProxyInterface $currentUser,
     protected EntityTypeManagerInterface $entities,
     protected StorageInterface $configStorage,
-    protected JobVersionResolverInterface $versions,
+    protected TaskJobResolver $jobs,
     protected ChecklistContextCollectorInterface $contexts,
     protected ContextHandlerInterface $contextHandler,
     protected UuidInterface $uuid,
     protected TimeInterface $time,
   ) {}
+
+  /**
+   * Content grants belong to immutable revisions; config grants retain IDs.
+   */
+  protected function key(JobInterface $job): string {
+    return $job instanceof RevisionableInterface
+      ? $job->getEntityTypeId() . ':' . $job->id() . ':' . $job->getRevisionId()
+      : $job->id();
+  }
 
   /**
    * {@inheritdoc}
@@ -49,7 +60,7 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
    */
   public function hasDelegation(JobInterface $job): bool {
     $groups = [$job->getChecklistItems()];
-    foreach ($job->get('checklist_templates') ?: [] as $template) {
+    foreach ($job->getDefinitionValue('checklist_templates') ?: [] as $template) {
       $groups[] = $template['items'] ?? [];
     }
     $delegated = FALSE;
@@ -71,9 +82,26 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
    * Hashes the definition and transitive declared configuration dependencies.
    */
   public function fingerprint(JobInterface $job): string {
-    $job->calculateDependencies();
-    $definition = Job::definitionHash($job->toArray());
-    $pending = $job->getDependencies()['config'] ?? [];
+    $configuration = $job;
+    if (!$job instanceof ConfigEntityInterface) {
+      // Reuse the config job's dependency discovery without persisting config.
+      $values = ['id' => 'content_job', 'label' => $job->label()];
+      foreach ([
+        'context', 'description', 'resources', 'default_checklist',
+        'checklist_templates', 'checklist_includes', 'triggers', 'assignment_rules',
+      ] as $name) {
+        $values[$name] = $job->getDefinitionValue($name);
+      }
+      $configuration = Job::create($values);
+    }
+    $configuration->calculateDependencies();
+    // SQL field storage normalizes IDs, booleans and revision metadata. Hash
+    // the executable definition for content jobs, not those storage details.
+    // The grant key binds its entity type, ID and immutable revision.
+    $definition = $job instanceof ConfigEntityInterface
+      ? Job::definitionHash($job->toArray())
+      : hash('sha256', serialize([$job->getActiveHash(), (bool) $job->status()]));
+    $pending = $configuration->getDependencies()['config'] ?? [];
     $dependencies = [];
     while ($name = array_pop($pending)) {
       if (array_key_exists($name, $dependencies)) {
@@ -91,17 +119,17 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
    * Checks every entity save, including changes to dirty working versions.
    */
   public function checkSave(JobInterface $job): void {
-    if ($job->isSyncing() || $job->hasTrustedData()) {
+    if ($job instanceof ConfigEntityInterface && ($job->isSyncing() || $job->hasTrustedData())) {
       // Imports and default configuration installs may declare policy, but
       // neither manufactures consent from the account running the import.
       return;
     }
-    $original = $this->entities->getStorage('task_job')->loadUnchanged($job->id());
+    $original = $job->id() === NULL ? NULL : $this->entities->getStorage($job->getEntityTypeId())->loadUnchanged($job->id());
     if (!$this->hasDelegation($job) && (!$original || !$this->hasDelegation($original))) {
       return;
     }
     if (!$this->currentUser->hasPermission(self::PERMISSION)) {
-      if (!$original || $this->fingerprint($job) !== $this->fingerprint($original)) {
+      if (!$job instanceof ConfigEntityInterface || !$original || $this->fingerprint($job) !== $this->fingerprint($original)) {
         throw new AccessDeniedHttpException('Changing a job with delegated execution requires permission to authorize delegated checklist execution.');
       }
     }
@@ -112,23 +140,23 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
    */
   public function saved(JobInterface $job): void {
     $grants = $this->keyValue->get('task_job.execution_authorization');
-    if ($job->isSyncing() || $job->hasTrustedData() || !$this->hasDelegation($job)) {
-      $grants->delete($job->id());
+    if (($job instanceof ConfigEntityInterface && ($job->isSyncing() || $job->hasTrustedData())) || !$this->hasDelegation($job)) {
+      $grants->delete($this->key($job));
       return;
     }
     $fingerprint = $this->fingerprint($job);
-    $existing = $grants->get($job->id());
-    if ($existing && $existing['fingerprint'] === $fingerprint && $this->activeAuthorizer($existing['authorizer'])) {
+    $existing = $grants->get($this->key($job));
+    if ($existing && $existing['fingerprint'] === $fingerprint && $this->activeAuthorizer($existing['authorizer'], $job)) {
       return;
     }
     if (!$this->currentUser->isAuthenticated() || !$this->currentUser->hasPermission(self::PERMISSION)) {
       throw new AccessDeniedHttpException('Only an authorized account can approve delegated job execution.');
     }
-    $grants->set($job->id(), [
+    $grants->set($this->key($job), [
       'source' => 'task_job',
       'grant' => $this->uuid->generate(),
       'approved' => $this->time->getCurrentTime(),
-      'job' => $job->id(),
+      'job' => $this->key($job),
       'authorizer' => (int) $this->currentUser->id(),
       'fingerprint' => $fingerprint,
     ]);
@@ -137,21 +165,30 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
   /**
    * Rechecks the approving user's current account and permissions.
    */
-  protected function activeAuthorizer(int $uid): bool {
+  protected function activeAuthorizer(int $uid, JobInterface $job): bool {
     $this->entities->getStorage('user_role')->resetCache();
     $account = $this->entities->getStorage('user')->loadUnchanged($uid);
-    return $account && $account->isActive() && $account->hasPermission(self::PERMISSION);
+    if (!$account || !$account->isActive() || !$account->hasPermission(self::PERMISSION)) {
+      return FALSE;
+    }
+    if ($job instanceof ConfigEntityInterface) {
+      return TRUE;
+    }
+    // Entity access caches survive in a worker even for max-age-zero results.
+    // Recheck content ownership and permissions against the refreshed account.
+    $this->entities->getAccessControlHandler($job->getEntityTypeId())->resetCache();
+    return $job->access('update', $account);
   }
 
   /**
    * Requires local approval before creating or executing delegated work.
    */
   public function approvedGrant(JobInterface $job): array {
-    $grant = $this->keyValue->get('task_job.execution_authorization')->get($job->id());
+    $grant = $this->keyValue->get('task_job.execution_authorization')->get($this->key($job));
     if (!$grant || $grant['fingerprint'] !== $this->fingerprint($job)) {
       throw new AccessDeniedHttpException('This job definition needs local approval for delegated execution.');
     }
-    if (!$this->activeAuthorizer($grant['authorizer'])) {
+    if (!$this->activeAuthorizer($grant['authorizer'], $job)) {
       throw new AccessDeniedHttpException('The job execution authorizer is no longer authorized.');
     }
     return $grant;
@@ -172,7 +209,7 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
     }
     // Resolve the task's actual job, not a client-supplied checklist config ID.
     $this->entities->getStorage('task_job')->resetCache();
-    $job = $this->versions->load((string) $task->get('job')->target_id, $task->get('job_version')->value);
+    $job = $this->jobs->resolve($task);
     if (!$job) {
       return;
     }
@@ -180,7 +217,7 @@ class JobExecutionAuthorization implements EventSubscriberInterface {
     if (!$definition || ($definition['execution']['mode'] ?? 'self') !== 'context') {
       return;
     }
-    if ($type->getJob()?->id() !== $job->id()) {
+    if (!$type->getJob() || $this->key($type->getJob()) !== $this->key($job)) {
       throw new AccessDeniedHttpException('The checklist source does not match the authorized job.');
     }
     // JobChecklist replaces unfinished item definitions with the source. Check

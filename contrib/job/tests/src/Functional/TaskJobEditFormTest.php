@@ -157,7 +157,7 @@ class TaskJobEditFormTest extends BrowserTestBase {
     $this->assertSame('context', $this->saved()->getChecklistItems()['work']['execution']['mode']);
 
     // Expire the first author's draft lock before the second editor enters.
-    $this->container->get('tempstore.shared')->get('task_jobtask_job')->delete('follow_up');
+    $this->container->get('tempstore.shared')->get('task_jobtask_job')->delete('task_job:follow_up');
     $this->drupalLogin($this->drupalCreateUser(['administer task jobs']));
     $this->drupalGet('/admin/config/task/job/follow_up/edit');
     $this->clickLink('configure');

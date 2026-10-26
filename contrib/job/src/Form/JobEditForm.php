@@ -2,6 +2,7 @@
 
 namespace Drupal\task_job\Form;
 
+use Drupal\task_job\JobEditor;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Drupal\Core\Ajax\ReplaceCommand;
 use Drupal\checklist\ChecklistItemHandlerManager;
@@ -18,7 +19,6 @@ use Drupal\Core\Plugin\PluginFormFactoryInterface;
 use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\Render\Element;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Core\Url;
 use Drupal\entity_template\BlueprintTempstoreRepository;
 use Drupal\entity_template\TemplateBlueprintProviderManager;
 use Drupal\task_job\JobInterface;
@@ -234,7 +234,7 @@ class JobEditForm extends JobForm {
     $form['add_assignment_rule'] = [
       '#type' => 'link',
       '#title' => $this->t('Add assignment rule'),
-      '#url' => Url::fromRoute('task_job.assignment.add', ['task_job' => $this->entity->id()], $ajax_attributes),
+      '#url' => JobEditor::url($this->entity, 'task_job.assignment.add', ['task_job' => $this->entity->id()], $ajax_attributes),
       '#attributes' => ['class' => ['button']],
     ];
     $form['assignment_rules'] = [
@@ -243,8 +243,8 @@ class JobEditForm extends JobForm {
       '#empty' => $this->t('No assignment rules. Tasks remain unassigned unless an assignee is explicitly supplied.'),
       '#tabledrag' => [['action' => 'order', 'relationship' => 'sibling', 'group' => 'assignment-rule-weight']],
     ];
-    foreach (array_keys($this->entity->get('assignment_rules') ?: []) as $weight => $key) {
-      $rule = $this->entity->get('assignment_rules')[$key];
+    foreach (array_keys($this->entity->getDefinitionValue('assignment_rules') ?: []) as $weight => $key) {
+      $rule = $this->entity->getDefinitionValue('assignment_rules')[$key];
       $form['assignment_rules'][$key] = [
         '#attributes' => ['class' => ['draggable']],
         '#weight' => $weight,
@@ -256,7 +256,7 @@ class JobEditForm extends JobForm {
           'configure' => [
             '#type' => 'link',
             '#title' => $this->t('Configure'),
-            '#url' => Url::fromRoute('task_job.assignment.configure', [
+            '#url' => JobEditor::url($this->entity, 'task_job.assignment.configure', [
               'task_job' => $this->entity->id(),
               'rule' => $key,
             ], $ajax_attributes),
@@ -274,7 +274,7 @@ class JobEditForm extends JobForm {
           '#title' => $this->t('Order for @rule', ['@rule' => $rule['label']]),
           '#title_display' => 'invisible',
           '#default_value' => $weight,
-          '#delta' => max(10, count($this->entity->get('assignment_rules'))),
+          '#delta' => max(10, count($this->entity->getDefinitionValue('assignment_rules'))),
           '#attributes' => ['class' => ['assignment-rule-weight']],
         ],
       ];
@@ -286,9 +286,9 @@ class JobEditForm extends JobForm {
    * Removes a rule from the draft only.
    */
   public function removeAssignmentRule(array &$form, FormStateInterface $form_state): void {
-    $rules = $this->entity->get('assignment_rules');
+    $rules = $this->entity->getDefinitionValue('assignment_rules');
     unset($rules[$form_state->getTriggeringElement()['#rule']]);
-    $this->entity->set('assignment_rules', $rules);
+    $this->entity->setDefinitionValue('assignment_rules', $rules);
     $this->saveDraft($form, $form_state);
   }
 
@@ -490,7 +490,7 @@ class JobEditForm extends JobForm {
     $form['resources']['add'] = [
       '#type' => 'link',
       '#title' => $this->t('Add Resource'),
-      '#url' => Url::fromRoute(
+      '#url' => JobEditor::url($this->entity,
         'task_job.resource.choose_block',
         [
           'task_job' => $this->entity->id(),
@@ -519,7 +519,7 @@ class JobEditForm extends JobForm {
         '#links' => [
           'configure' => [
             'title' => $this->t('configure'),
-            'url' => Url::fromRoute(
+            'url' => JobEditor::url($this->entity,
               'task_job.resource.configure',
               [
                 'task_job' => $this->entity->id(),
@@ -532,7 +532,7 @@ class JobEditForm extends JobForm {
           ],
           'remove' => [
             'title' => $this->t('remove'),
-            'url' => Url::fromRoute(
+            'url' => JobEditor::url($this->entity,
               'task_job.resource.remove',
               [
                 'task_job' => $this->entity->id(),
@@ -561,10 +561,10 @@ class JobEditForm extends JobForm {
     }
     else {
       $options = [];
-      foreach ($this->entity->get('checklist_templates') ?: [] as $name => $definition) {
+      foreach ($this->entity->getDefinitionValue('checklist_templates') ?: [] as $name => $definition) {
         $options[$name] = $definition['label'];
       }
-      foreach ($this->entity->get('checklist_includes') ?: [] as $name) {
+      foreach ($this->entity->getDefinitionValue('checklist_includes') ?: [] as $name) {
         $options[$name] ??= $this->t('Missing template: @name', ['@name' => $name]);
       }
       $form['checklist_includes'] = [
@@ -572,7 +572,7 @@ class JobEditForm extends JobForm {
         '#title' => $this->t('Include checklist templates'),
         '#description' => $this->t('Selected templates add their items after the default items. Item names must be unique across the resulting checklist.'),
         '#options' => $options,
-        '#default_value' => $this->entity->get('checklist_includes') ?: [],
+        '#default_value' => $this->entity->getDefinitionValue('checklist_includes') ?: [],
         '#access' => !empty($options),
       ];
     }
@@ -586,7 +586,7 @@ class JobEditForm extends JobForm {
     $form['checklist']['add'] = [
       '#type' => 'link',
       '#title' => $this->t('Add Checklist Item'),
-      '#url' => Url::fromRoute(
+      '#url' => JobEditor::url($this->entity,
         'task_job.checklist_item.choose_handler',
         [
           'task_job' => $this->entity->id(),
@@ -633,7 +633,7 @@ class JobEditForm extends JobForm {
         '#links' => [
           'configure' => [
             'title' => $this->t('configure'),
-            'url' => Url::fromRoute(
+            'url' => JobEditor::url($this->entity,
               'task_job.checklist_item.configure',
               [
                 'task_job' => $this->entity->id(),
@@ -646,7 +646,7 @@ class JobEditForm extends JobForm {
           ],
           'remove' => [
             'title' => $this->t('remove'),
-            'url' => Url::fromRoute(
+            'url' => JobEditor::url($this->entity,
               'task_job.checklist_item.remove',
               [
                 'task_job' => $this->entity->id(),
@@ -673,7 +673,7 @@ class JobEditForm extends JobForm {
     $form['template_help'] = ['#markup' => $this->t('Define named groups of checklist items here, then select them on the Checklist tab. Templates share this job version and can declare their own inputs alongside normal task contexts.')];
     $name = $form_state->get('selected_template');
     if ($name !== NULL) {
-      $templates = $this->entity->get('checklist_templates') ?: [];
+      $templates = $this->entity->getDefinitionValue('checklist_templates') ?: [];
       if (!isset($templates[$name])) {
         throw new NotFoundHttpException();
       }
@@ -725,7 +725,7 @@ class JobEditForm extends JobForm {
           'edit' => [
             '#type' => 'link',
             '#title' => $this->t('Edit'),
-            '#url' => Url::fromRoute('task_job.template_context.edit', [
+            '#url' => JobEditor::url($this->entity, 'task_job.template_context.edit', [
               'task_job' => $this->entity->id(),
               'template' => $name,
               'context_name' => $key,
@@ -737,7 +737,7 @@ class JobEditForm extends JobForm {
         '#type' => 'link',
         '#title' => $this->t('Add template input'),
         '#attributes' => ['class' => ['button']],
-        '#url' => Url::fromRoute('task_job.template_context.add', [
+        '#url' => JobEditor::url($this->entity, 'task_job.template_context.add', [
           'task_job' => $this->entity->id(),
           'template' => $name,
         ], $dialog),
@@ -774,7 +774,7 @@ class JobEditForm extends JobForm {
    */
   public function validateTemplateName(array &$form, FormStateInterface $form_state): void {
     $name = $form_state->getValue(['new_template', 'name'], '');
-    $templates = $this->entity->get('checklist_templates') ?: [];
+    $templates = $this->entity->getDefinitionValue('checklist_templates') ?: [];
     if (!preg_match('/^[a-z][a-z0-9_]*$/D', $name) || isset($templates[$name])) {
       $form_state->setError($form['new_template']['name'], $this->t('Use a unique machine name starting with a lowercase letter, followed by lowercase letters, digits or underscores.'));
     }
@@ -787,12 +787,12 @@ class JobEditForm extends JobForm {
    * Adds a named definition to the draft, never the saved job.
    */
   public function addTemplate(array &$form, FormStateInterface $form_state): void {
-    $templates = $this->entity->get('checklist_templates') ?: [];
+    $templates = $this->entity->getDefinitionValue('checklist_templates') ?: [];
     $templates[$form_state->getValue(['new_template', 'name'])] = [
       'label' => $form_state->getValue(['new_template', 'label']),
       'items' => [],
     ];
-    $this->entity->set('checklist_templates', $templates);
+    $this->entity->setDefinitionValue('checklist_templates', $templates);
     $form_state->set('selected_template', $form_state->getValue(['new_template', 'name']));
     $this->saveDraft($form, $form_state);
   }
@@ -803,7 +803,7 @@ class JobEditForm extends JobForm {
   public function validateTemplateRemoval(array &$form, FormStateInterface $form_state): void {
     $name = $form_state->getTriggeringElement()['#template_name'];
     $definitions = [$this->entity->getChecklistItems()];
-    foreach ($this->entity->get('checklist_templates') ?: [] as $template) {
+    foreach ($this->entity->getDefinitionValue('checklist_templates') ?: [] as $template) {
       $definitions[] = $template['items'] ?? [];
     }
     foreach ($definitions as $items) {
@@ -823,7 +823,7 @@ class JobEditForm extends JobForm {
         }
       }
     }
-    if (in_array($name, $this->entity->get('checklist_includes') ?: [], TRUE)) {
+    if (in_array($name, $this->entity->getDefinitionValue('checklist_includes') ?: [], TRUE)) {
       $form_state->setError($form['templates'][$name]['remove'], $this->t('Remove this template from the Checklist tab before deleting it.'));
     }
   }
@@ -832,9 +832,9 @@ class JobEditForm extends JobForm {
    * Removes an unused definition from the draft.
    */
   public function removeTemplate(array &$form, FormStateInterface $form_state): void {
-    $templates = $this->entity->get('checklist_templates');
+    $templates = $this->entity->getDefinitionValue('checklist_templates');
     unset($templates[$form_state->getTriggeringElement()['#template_name']]);
-    $this->entity->set('checklist_templates', $templates);
+    $this->entity->setDefinitionValue('checklist_templates', $templates);
     $form_state->set('selected_template', NULL);
     $this->saveDraft($form, $form_state);
   }
@@ -852,7 +852,7 @@ class JobEditForm extends JobForm {
     $form['triggers']['__add'] = [
       '#type' => 'link',
       '#title' => $this->t('Add Trigger'),
-      '#url' => Url::fromRoute(
+      '#url' => JobEditor::url($this->entity,
         'task_job.trigger.choose',
         [
           'task_job' => $this->entity->id(),
@@ -1018,24 +1018,24 @@ class JobEditForm extends JobForm {
     // incomplete trigger form arrays are not entity properties.
     foreach (['label', 'description'] as $property) {
       if (isset($form[$property]) && $form_state->hasValue($property)) {
-        $entity->set($property, $form_state->getValue($property));
+        $entity->setDefinitionValue($property, $form_state->getValue($property));
       }
     }
     if (isset($form['assignment_rules'])) {
       $weights = $form_state->getValue('assignment_rules') ?: [];
       uasort($weights, static fn(array $a, array $b) => $a['weight'] <=> $b['weight']);
-      $rules = $entity->get('assignment_rules') ?: [];
-      $entity->set('assignment_rules', array_replace(array_intersect_key($weights, $rules), $rules));
+      $rules = $entity->getDefinitionValue('assignment_rules') ?: [];
+      $entity->setDefinitionValue('assignment_rules', array_replace(array_intersect_key($weights, $rules), $rules));
     }
     if (isset($form['checklist_includes'])) {
-      $entity->set('checklist_includes', array_values(array_filter($form_state->getValue('checklist_includes', []))));
+      $entity->setDefinitionValue('checklist_includes', array_values(array_filter($form_state->getValue('checklist_includes', []))));
     }
     if (isset($form['templates'])) {
-      $templates = $entity->get('checklist_templates');
+      $templates = $entity->getDefinitionValue('checklist_templates');
       foreach ($form_state->getValue('templates', []) as $name => $values) {
         $templates[$name]['label'] = $values['label'];
       }
-      $entity->set('checklist_templates', $templates);
+      $entity->setDefinitionValue('checklist_templates', $templates);
     }
     if (isset($form['context_wrapper'])) {
       foreach ($form_state->getValue('context', []) as $key => $values) {
@@ -1083,8 +1083,9 @@ class JobEditForm extends JobForm {
       $this->copyFormValuesToEntity($candidate, $form, $form_state);
       try {
         $candidate->getExpandedChecklistItems();
+        \Drupal::service('task_job.execution_authorization')->checkSave($candidate);
       }
-      catch (\InvalidArgumentException $exception) {
+      catch (\InvalidArgumentException | AccessDeniedHttpException $exception) {
         $form_state->setErrorByName('checklist_includes', $exception->getMessage());
       }
     }
@@ -1147,12 +1148,12 @@ class JobEditForm extends JobForm {
         'template' => $storage->getTemplate('default')->getConfiguration(),
       ] + $trigger->getConfiguration();
     }
-    $this->entity->set('triggers', $triggers_config);
+    $this->entity->setDefinitionValue('triggers', $triggers_config);
     $this->entity->getTriggerCollection()->setConfiguration($triggers_config);
     foreach ($this->blueprintStorages as $storage) {
       $this->blueprintTempstoreRepository->delete($storage);
     }
-    $this->entity->set('resources', $this->entity->getResourcesCollection()->getConfiguration());
+    $this->entity->setDefinitionValue('resources', $this->entity->getResourcesCollection()->getConfiguration());
   }
 
   /**
@@ -1212,7 +1213,7 @@ class JobEditForm extends JobForm {
    */
   public function submitFormCancel(array $form, FormStateInterface $form_state) {
     $this->tempstoreRepository->delete($this->entity);
-    $this->entity = $this->entityTypeManager->getStorage('task_job')->loadUnchanged($this->entity->id());
+    $this->entity = $this->entityTypeManager->getStorage($this->entity->getEntityTypeId())->loadUnchanged($this->entity->id());
     $form_state->setRedirectUrl($this->tempstoreRepository->getEditUrl($this->entity, $this->section($form_state), $form_state->get('selected_template')));
   }
 
@@ -1331,7 +1332,7 @@ class JobEditForm extends JobForm {
     $this->entity->getTriggerCollection()->removeInstanceId($button['#trigger_key']);
     $triggers = $this->entity->getTriggersConfiguration();
     unset($triggers[$button['#trigger_key']]);
-    $this->entity->set('triggers', $triggers);
+    $this->entity->setDefinitionValue('triggers', $triggers);
     $form_state->setRebuild(TRUE);
 
     $this->blueprintTempstoreRepository->delete($this->blueprintStorages[$button['#trigger_key']]);

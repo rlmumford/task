@@ -41,7 +41,7 @@ class TemplateContextForm extends FormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state, ?JobInterface $task_job = NULL, ?string $template = NULL, ?string $context_name = NULL) {
     $job = $this->drafts->get($task_job);
-    $templates = $job->get('checklist_templates') ?: [];
+    $templates = $job->getDefinitionValue('checklist_templates') ?: [];
     if (!isset($templates[$template]) || ($context_name !== NULL && !isset($templates[$template]['context'][$context_name]))) {
       throw new NotFoundHttpException();
     }
@@ -106,7 +106,7 @@ class TemplateContextForm extends FormBase {
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
     $name = trim($form_state->getValue('name'));
-    $definitions = $form_state->get('job')->get('checklist_templates')[$form_state->get('template')]['context'] ?? [];
+    $definitions = $form_state->get('job')->getDefinitionValue('checklist_templates')[$form_state->get('template')]['context'] ?? [];
     if (!preg_match('/^[a-z][a-z0-9_]*$/D', $name) || ($form_state->get('context_name') === NULL && isset($definitions[$name]))) {
       $form_state->setError($form['name'], $this->t('Use a unique machine name starting with a lowercase letter, followed by lowercase letters, digits or underscores.'));
     }
@@ -118,7 +118,7 @@ class TemplateContextForm extends FormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     // Merge into the latest draft rather than an older dialog's job snapshot.
     $job = $this->drafts->get($form_state->get('job'));
-    $templates = $job->get('checklist_templates');
+    $templates = $job->getDefinitionValue('checklist_templates');
     $template = $form_state->get('template');
     $name = $form_state->get('context_name') ?? trim($form_state->getValue('name'));
     if ($form_state->getValue('remove')) {
@@ -136,7 +136,7 @@ class TemplateContextForm extends FormBase {
         'multiple' => (bool) $form_state->getValue('multiple'),
       ];
     }
-    $job->set('checklist_templates', $templates);
+    $job->setDefinitionValue('checklist_templates', $templates);
     $this->drafts->set($job, 'templates', $template);
     $form_state->set('job', $job);
     $form_state->setRedirectUrl($this->drafts->getEditUrl($job));

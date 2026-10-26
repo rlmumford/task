@@ -43,8 +43,8 @@ class JobConfigurationChecklist extends Checklist {
 
     $job = clone $job;
     $items = $job->getChecklistItems();
-    $templates = $job->get('checklist_templates') ?: [];
-    foreach ($job->get('checklist_includes') ?: [] as $include) {
+    $templates = $job->getDefinitionValue('checklist_templates') ?: [];
+    foreach ($job->getDefinitionValue('checklist_includes') ?: [] as $include) {
       // Keep the editor usable while references or names are being repaired.
       $items += $templates[$include]['items'] ?? [];
     }
@@ -52,7 +52,7 @@ class JobConfigurationChecklist extends Checklist {
       $items = $job->getChecklistItems($template) + $items;
     }
     $job->setChecklistItems($items);
-    $job->set('checklist_includes', []);
+    $job->setDefinitionValue('checklist_includes', []);
 
     $checklist = new static(
       $checklist_type_manager->createInstance('job', ['job' => $job])
@@ -77,9 +77,7 @@ class JobConfigurationChecklist extends Checklist {
     /** @var \Drupal\task_job\Plugin\ChecklistType\Job $type */
     parent::__construct(
       $type,
-      Task::create([
-        'job' => $type->getJob(),
-      ]),
+      Task::create($type->getJob()->getTaskValues()),
       'checklist'
     );
   }

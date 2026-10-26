@@ -16,7 +16,7 @@ use Drupal\task\Entity\Task;
 use Drupal\task_checklist\TaskChecklistRequestStorageInterface;
 use Drupal\task_job\JobExecutionAuthorization;
 use Drupal\task_job\JobChecklistExpansion;
-use Drupal\task_job\JobVersionResolverInterface;
+use Drupal\task_job\TaskJobResolver;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -28,7 +28,7 @@ class AdditionManager {
   public function __construct(
     protected EntityTypeManagerInterface $entities,
     protected ChecklistResolver $resolver,
-    protected JobVersionResolverInterface $versions,
+    protected TaskJobResolver $jobs,
     protected AdditionStorage $storage,
     protected JobExecutionAuthorization $authorization,
     protected AccountProxyInterface $account,
@@ -64,8 +64,8 @@ class AdditionManager {
       throw new AccessDeniedHttpException('Only the task job can supply additional work.');
     }
     $this->entities->getStorage('task_job')->resetCache();
-    $job = $this->versions->load((string) $task->get('job')->target_id, $task->get('job_version')->value);
-    if (!$job || $job->id() !== $type->getJob()?->id() || (string) ($type->getConfiguration()['job_version'] ?? '') !== (string) $task->get('job_version')->value) {
+    $job = $this->jobs->resolve($task);
+    if (!$job || $job->id() !== $type->getJob()?->id() || $job->getEntityTypeId() !== $type->getJob()?->getEntityTypeId() || ($job->getEntityTypeId() === 'task_job' && (string) ($type->getConfiguration()['job_version'] ?? '') !== (string) $task->get('job')->version)) {
       throw new AccessDeniedHttpException('The task job is unavailable or does not match the checklist.');
     }
     return [$task, $job, $checklist];
@@ -77,7 +77,7 @@ class AdditionManager {
   public function discover(Task $task): array {
     [$task, $job, $checklist] = $this->prepare($task);
     $templates = [];
-    foreach ($job->get('checklist_templates') ?: [] as $name => $definition) {
+    foreach ($job->getDefinitionValue('checklist_templates') ?: [] as $name => $definition) {
       foreach (AdditionDefinitions::exposures($definition) as $button => $exposure) {
         if (!empty($exposure['enabled']) && !empty($definition['items']) && $this->available($checklist, $exposure)) {
           $choice = $button === 'default' ? $name : $name . ':' . $button;
@@ -118,7 +118,7 @@ class AdditionManager {
         }
         return $existing;
       }
-      $definitions = $job->get('checklist_templates') ?: [];
+      $definitions = $job->getDefinitionValue('checklist_templates') ?: [];
       $exposure = AdditionDefinitions::exposures($definitions[$template] ?? [])[$button] ?? [];
       if (empty($exposure['enabled']) || empty($definitions[$template]['items'])) {
         throw new AccessDeniedHttpException('This template is not available for staff addition.');

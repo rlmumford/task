@@ -33,7 +33,7 @@ class AdditionDefinitions implements EventSubscriberInterface {
       if ($receipt['job'] !== $event->job->getBaseJobId() || $receipt['job_version'] !== (string) $event->job->getVersion()) {
         continue;
       }
-      $definitions = JobChecklistExpansion::instance($receipt['template'], $event->job->get('checklist_templates') ?: [], self::prefix($receipt['id']), self::contextMapping($event->job, $receipt['template'], $receipt['exposure']));
+      $definitions = JobChecklistExpansion::instance($receipt['template'], $event->job->getDefinitionValue('checklist_templates') ?: [], self::prefix($receipt['id']), self::contextMapping($event->job, $receipt['template'], $receipt['exposure']));
       if (array_intersect_key($event->definitions, $definitions)) {
         throw new \InvalidArgumentException('An addition collides with an existing checklist item name.');
       }
@@ -63,7 +63,7 @@ class AdditionDefinitions implements EventSubscriberInterface {
    * Only the invoked template's declared inputs can be mapped by a button.
    */
   public static function contextMapping(JobInterface $job, string $template, string $exposure = 'default'): array {
-    $definition = $job->get('checklist_templates')[$template] ?? [];
+    $definition = $job->getDefinitionValue('checklist_templates')[$template] ?? [];
     $mapping = self::exposures($definition)[$exposure]['context_mapping'] ?? [];
     if (array_diff_key($mapping, ChecklistContextMapping::definitions($definition['context'] ?? []))) {
       throw new \InvalidArgumentException('Addition context mappings can only target declared template inputs.');

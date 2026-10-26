@@ -257,7 +257,8 @@ class JobExecutionAuthorizationTest extends KernelTestBase {
     $versions = $this->container->get('task_job.version_resolver');
     $version = $versions->createVersion($job, '6');
     $version->save();
-    $task->set('job_version', '6')->save();
+    $task->get('job')->version = '6';
+    $task->save();
     $current->setAccount($this->caller);
     $runner = $this->container->get('checklist.item_executor');
     $attempt = $runner->submit($item, TRUE);

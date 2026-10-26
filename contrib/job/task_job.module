@@ -21,19 +21,11 @@ function task_job_entity_base_field_info(EntityTypeInterface $entity_type) {
   $fields = [];
 
   if ($entity_type->id() == 'task') {
-    $fields['job'] = BaseFieldDefinition::create('entity_reference')
+    $fields['job'] = BaseFieldDefinition::create('task_job_reference')
       ->setLabel(new TranslatableMarkup('Job'))
-      ->setDescription(new TranslatableMarkup('The Job'))
-      ->setSetting('target_type', 'task_job')
-      ->setDisplayConfigurable('view', TRUE)
-      ->setDisplayConfigurable('form', TRUE);
-    $fields['job_version'] = BaseFieldDefinition::create('string')
-      ->setLabel(new TranslatableMarkup('Job version'))
-      ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
-      ->setSetting('max_length', 128)
+      ->setDescription(new TranslatableMarkup('The job definition used by this task.'))
       ->setInternal(TRUE)
-      ->setDisplayConfigurable('view', TRUE)
-      ->setDisplayConfigurable('form', TRUE);
+      ->setDisplayConfigurable('view', TRUE);
   }
 
   return $fields;
@@ -55,18 +47,16 @@ function task_job_entity_base_field_info_alter(&$fields, EntityTypeInterface $en
  *   The task.
  */
 function _task_job_task_checklist_default_value(EntityInterface $task) {
-  if (!$task->job->isEmpty()) {
-    $configuration = [
-      'job' => $task->job->target_id,
-    ];
-    if (!$task->get('job_version')->isEmpty()) {
-      $configuration['job_version'] = $task->get('job_version')->value;
+  $job = \Drupal::service('task_job.resolver')->resolve($task);
+  if ($job) {
+    $configuration = ['job' => $job];
+    if ($job->getEntityTypeId() === 'task_job') {
+      $configuration = ['job' => $task->get('job')->target_id];
+      if ($task->get('job')->version !== NULL) {
+        $configuration['job_version'] = $task->get('job')->version;
+      }
     }
-
-    return [
-      'id' => 'job',
-      'configuration' => $configuration,
-    ];
+    return ['id' => 'job', 'configuration' => $configuration];
   }
 
   return NULL;
@@ -82,14 +72,11 @@ function task_job_typed_data_reference_property_definitions(FieldItemListInterfa
   if (
     $item_list->getFieldDefinition()->getName() === 'context' &&
     $item_list->getFieldDefinition()->getTargetEntityTypeId() === 'task' &&
-    $entity->hasField('job') &&
-    !$entity->get('job')->isEmpty()
+    $entity->hasField('job')
   ) {
     /** @var \Drupal\task_job\Entity\Job $job */
     // Configuration checklists supply a job with unsaved context definitions.
-    $job = $entity->get('job_version')->isEmpty()
-      ? $entity->job->entity
-      : \Drupal::service('task_job.version_resolver')->load($entity->job->target_id, $entity->get('job_version')->value);
+    $job = \Drupal::service('task_job.resolver')->resolve($entity);
     foreach ($job?->getContextDefinitions() ?? [] as $key => $definition) {
       $definitions[$key] = $definition->getDataDefinition();
     }
@@ -151,7 +138,8 @@ function _task_job_trigger_entity_operation(string $op, EntityInterface $entity)
 function task_job_form_task_form_alter(array &$form, FormStateInterface $form_state) {
   $task = $form_state->getFormObject()->getEntity();
 
-  if (!$task->job->isEmpty() && $task->isNew()) {
+  $job = \Drupal::service('task_job.resolver')->resolve($task);
+  if ($job && $task->isNew()) {
     if (!$task->title->isEmpty()) {
       $form['title']['widget'][0]['value']['#disabled'] = TRUE;
     }
@@ -159,7 +147,7 @@ function task_job_form_task_form_alter(array &$form, FormStateInterface $form_st
       $form['description']['widget'][0]['#disabled'] = TRUE;
     }
 
-    if (empty($form['checklist']) && $task->job->entity->getChecklistItems()) {
+    if (empty($form['checklist']) && $job->getChecklistItems()) {
       $form['checklist'] = $task->checklist->view([
         'type' => 'checklist_preview',
       ]);
@@ -178,7 +166,8 @@ function task_job_task_prepare_form(EntityInterface $task, string $op, FormState
   /** @var \Drupal\Core\Entity\Display\EntityFormDisplayInterface $form_display */
   $form_display = $form_state->get('form_display');
 
-  if ($task->isNew() && !$task->job->isEmpty() && !$task->job->entity->getChecklistItems()) {
+  $job = \Drupal::service('task_job.resolver')->resolve($task);
+  if ($task->isNew() && $job && !$job->getChecklistItems()) {
     $form_display->setComponent('checklist', [
       'type' => 'checklist_simple',
       'weight' => $form_display->getComponent('description')['weight'] ?? 5,
@@ -240,4 +229,20 @@ function task_job_task_job_update(JobInterface $job) {
  */
 function task_job_task_job_delete(JobInterface $job) {
   \Drupal::keyValue('task_job.execution_authorization')->delete($job->id());
+}
+
+/**
+ * Implements hook_task_storage_prewrite().
+ */
+function task_job_task_storage_prewrite(EntityInterface $task): void {
+  $reference = $task->get('job');
+  // Drupal 10 exposes the original entity as a property.
+  $original = method_exists($task, 'getOriginal') ? $task->getOriginal() : ($task->original ?? NULL);
+  if ($original) {
+    $previous = $original->get('job');
+    if (!$previous->isEmpty() && $previous->target_type !== 'task_job' && $previous->getValue() !== $reference->getValue()) {
+      throw new \DomainException('An existing task must keep its content job reference and revision.');
+    }
+  }
+  \Drupal::service('task_job.resolver')->resolve($task, FALSE);
 }

@@ -119,13 +119,21 @@ class AssignmentRulesTest extends KernelTestBase {
     ])->save();
     $seven = $resolver->createVersion($job, '7');
     $seven->save();
-    $task = Task::create(['title' => 'Pinned', 'job' => $job, 'job_version' => '6', 'creator' => $creator]);
+    $task = Task::create([
+      'title' => 'Pinned',
+      'job' => ['target_type' => 'task_job', 'target_id' => $job->getBaseJobId(), 'version' => '6'],
+      'creator' => $creator,
+    ]);
     $task->get('context')->set('version_owner', $creator);
     $task->save();
     $this->assertEquals($creator->id(), $task->assignee->target_id);
     $dirty = $resolver->createDirtyVersion($six);
     $dirty->set('assignment_rules', [])->save();
-    $task = Task::create(['title' => 'Dirty', 'job' => $job, 'job_version' => '6', 'creator' => $creator]);
+    $task = Task::create([
+      'title' => 'Dirty',
+      'job' => ['target_type' => 'task_job', 'target_id' => $job->getBaseJobId(), 'version' => '6'],
+      'creator' => $creator,
+    ]);
     $task->save();
     $this->assertTrue($task->assignee->isEmpty());
   }

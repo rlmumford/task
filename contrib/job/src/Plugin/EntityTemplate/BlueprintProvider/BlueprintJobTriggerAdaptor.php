@@ -3,7 +3,6 @@
 namespace Drupal\task_job\Plugin\EntityTemplate\BlueprintProvider;
 
 use Drupal\Component\Plugin\Exception\ContextException;
-use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Plugin\Context\Context;
 use Drupal\Core\Plugin\Context\EntityContextDefinition;
@@ -91,7 +90,7 @@ class BlueprintJobTriggerAdaptor extends Blueprint {
     // trigger.
     return [
       'job' => new EntityContextDefinition(
-          'entity:task_job',
+          'entity:' . $this->getJob()->getEntityTypeId(),
           new TranslatableMarkup('Job'),
           FALSE,
           FALSE,
@@ -122,24 +121,7 @@ class BlueprintJobTriggerAdaptor extends Blueprint {
    * {@inheritdoc}
    */
   public function getBuilder() {
-    try {
-      return $this->builderManager()->createInstance(
-        'task_job:' . $this->getJob()->id()
-      );
-    }
-    catch (PluginNotFoundException $exception) {
-      // Sometimes we land here before the builder plugin has been registered.
-      return JobTaskBuilder::create(
-        \Drupal::getContainer(),
-        [],
-        'task_job:' . $this->getJob()->id(),
-        [
-          'task_job' => $this->getJob()->id(),
-          'label' => $this->getJob()->label(),
-          'context_definitions' => [],
-        ]
-      );
-    }
+    return JobTaskBuilder::forJob($this->getJob());
   }
 
   /**

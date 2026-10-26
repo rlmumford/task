@@ -91,7 +91,7 @@ class AddChecklistTemplate extends AutomaticChecklistItemHandlerBase implements 
       return [];
     }
     $template = $this->getConfiguration()['template'];
-    $templates = $this->job()->get('checklist_templates') ?: [];
+    $templates = $this->job()->getDefinitionValue('checklist_templates') ?: [];
     if (!isset($templates[$template])) {
       throw new \InvalidArgumentException('Select an existing checklist template.');
     }
@@ -127,7 +127,7 @@ class AddChecklistTemplate extends AutomaticChecklistItemHandlerBase implements 
   public function actionIteration(ChecklistAttempt $attempt): ChecklistItemResult {
     $job = $this->job();
     $configuration = $this->getConfiguration();
-    $definitions = JobChecklistExpansion::instance($configuration['template'], $job->get('checklist_templates') ?: [], '', $configuration['context_mapping']);
+    $definitions = JobChecklistExpansion::instance($configuration['template'], $job->getDefinitionValue('checklist_templates') ?: [], '', $configuration['context_mapping']);
     foreach ($definitions as $definition) {
       if (($definition['execution']['mode'] ?? 'self') === 'context') {
         $this->authorization->approvedGrant($job);
@@ -162,7 +162,7 @@ class AddChecklistTemplate extends AutomaticChecklistItemHandlerBase implements 
         [$field, $delta] = array_pad(explode(':', $reference->checklist_key, 2), 2, 0);
         $type = $reference->entity->get($field)->get($delta)->plugin;
         $definitions = $type->getItemDefinitions($reference->entity, key: $reference->checklist_key);
-        $expanded = JobTemplateCollection::expand($definitions, $job->get('checklist_templates') ?: [], [
+        $expanded = JobTemplateCollection::expand($definitions, $job->getDefinitionValue('checklist_templates') ?: [], [
           $parent->getName() => ['configuration' => $configuration, 'counts' => $counts],
         ], TRUE);
         foreach (array_diff_key($expanded, $definitions) as $name => $definition) {

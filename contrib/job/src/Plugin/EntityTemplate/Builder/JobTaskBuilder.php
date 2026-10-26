@@ -2,6 +2,7 @@
 
 namespace Drupal\task_job\Plugin\EntityTemplate\Builder;
 
+use Drupal\task_job\JobEditor;
 use Drupal\Core\Url;
 use Drupal\entity_template\BlueprintInterface;
 use Drupal\entity_template\BlueprintStorageInterface;
@@ -28,6 +29,19 @@ class JobTaskBuilder extends BuilderBase {
    * @var \Drupal\task_job\JobInterface
    */
   protected $job;
+
+  /**
+   * Builds against the supplied job, including an immutable content revision.
+   */
+  public static function forJob(JobInterface $job): static {
+    $builder = static::create(\Drupal::getContainer(), [], 'task_job', [
+      'task_job' => $job->id(),
+      'label' => $job->label(),
+      'context_definitions' => [],
+    ]);
+    $builder->job = $job;
+    return $builder;
+  }
 
   /**
    * Get the job.
@@ -66,10 +80,10 @@ class JobTaskBuilder extends BuilderBase {
    */
   public function getDefaultBlueprintEditTemplateUrl(
     BlueprintStorageInterface $blueprint_storage,
-    string $key
+    string $key,
   ): Url {
     /** @var \Drupal\entity_template\BlueprintEntityStorageAdaptor $blueprint_storage */
-    return Url::fromRoute(
+    return JobEditor::url($blueprint_storage->getEntity(),
       'entity.task_job.edit_form',
       [
         'task_job' => $blueprint_storage->getEntity()->id(),
@@ -97,7 +111,7 @@ class JobTaskBuilder extends BuilderBase {
    */
   public function massageInitialValues(array &$values, string $target_type_id, BlueprintInterface $blueprint) {
     if ($target_type_id === 'task') {
-      $values['job'] = $this->getJob();
+      $values = $this->getJob()->getTaskValues() + $values;
     }
   }
 

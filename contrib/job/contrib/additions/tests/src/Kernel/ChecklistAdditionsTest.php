@@ -370,7 +370,7 @@ class ChecklistAdditionsTest extends KernelTestBase {
     $templates['review']['addition_context_mapping'] = ['template_context:subject' => 'checklist:entity.title.value'];
     $version->set('checklist_templates', $templates)->save();
     $task->set('description', 'Dirty mapped input');
-    $task->set('job_version', '6');
+    $task->get('job')->version = '6';
     $task->set('checklist', ['id' => 'job', 'configuration' => ['job' => 'support', 'job_version' => '6']]);
     $task->save();
     $manager = $this->container->get('task_job_additions.manager');

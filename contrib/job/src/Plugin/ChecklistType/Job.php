@@ -6,6 +6,7 @@ use Drupal\checklist\ChecklistInterface;
 use Drupal\checklist\Plugin\ChecklistType\ChecklistTypeBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Plugin\PluginWithFormsInterface;
 use Drupal\Core\Plugin\PluginWithFormsTrait;
 use Drupal\task\Entity\Task;
@@ -88,6 +89,21 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
    * {@inheritdoc}
    */
   public function getChecklist(FieldableEntityInterface $entity, string $key): ChecklistInterface {
+    if ($entity instanceof Task) {
+      $job = \Drupal::service('task_job.resolver')->resolve($entity);
+      if ($job) {
+        unset($this->configuration['job_entity_type'], $this->configuration['job_revision'], $this->configuration['job_version']);
+        $this->configuration['job'] = $job;
+        if ($job->getEntityTypeId() === 'task_job') {
+          $this->configuration['job'] = $entity->get('job')->target_id;
+          $this->configuration['job_version'] = $entity->get('job')->version;
+        }
+      }
+      elseif (($this->configuration['job_entity_type'] ?? 'task_job') !== 'task_job'
+        || (($this->configuration['job'] ?? NULL) instanceof JobInterface && $this->configuration['job']->getEntityTypeId() !== 'task_job')) {
+        throw new \DomainException('A content job checklist requires the task’s authoritative job reference.');
+      }
+    }
     return new JobChecklist($this, $entity, $key);
   }
 
@@ -105,6 +121,11 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
       return $this->configuration['job'];
     }
 
+    if (($this->configuration['job_entity_type'] ?? 'task_job') !== 'task_job') {
+      $storage = \Drupal::entityTypeManager()->getStorage($this->configuration['job_entity_type']);
+      $job = $storage->loadRevision($this->configuration['job_revision']);
+      return $job instanceof JobInterface && (string) $job->id() === (string) $this->configuration['job'] ? $job : NULL;
+    }
     return $this->jobVersionResolver->load(
       $this->configuration['job'],
       $this->configuration['job_version'] ?? NULL
@@ -153,7 +174,7 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
         }
       }
     }
-    $event->definitions = JobTemplateCollection::expand($event->definitions, $job->get('checklist_templates') ?: [], $invocations);
+    $event->definitions = JobTemplateCollection::expand($event->definitions, $job->getDefinitionValue('checklist_templates') ?: [], $invocations);
     if (count($event->definitions) > 1000) {
       throw new \InvalidArgumentException('The task checklist exceeds 1,000 definitions.');
     }
@@ -204,7 +225,16 @@ class Job extends ChecklistTypeBase implements PluginWithFormsInterface {
 
     // Ensure job object is downcasted.
     if ($config['job'] instanceof JobInterface) {
-      $config['job'] = $config['job']->id();
+      $job = $config['job'];
+      $config['job'] = $job->id();
+      if ($job instanceof RevisionableInterface) {
+        $config['job_entity_type'] = $job->getEntityTypeId();
+        $config['job_revision'] = $job->getRevisionId();
+      }
+      elseif ($job->getVersion() !== NULL) {
+        $config['job'] = $job->getBaseJobId();
+        $config['job_version'] = $job->getVersion();
+      }
     }
 
     return $config;

@@ -2,6 +2,7 @@
 
 namespace Drupal\task_job\Plugin\EntityTemplate\BlueprintProvider;
 
+use Drupal\task_job\JobInterface;
 use Drupal\Component\Plugin\Context\ContextInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -153,7 +154,14 @@ class JobTrigger extends PluginBase implements BlueprintProviderInterface, Conta
     [$job_id, $trigger] = explode('.', $id, 2);
 
     /** @var \Drupal\task_job\JobInterface $job */
-    $job = $this->entityTypeManager->getStorage('task_job')->load($job_id);
+    [$type, $entity_id] = str_contains($job_id, ':') ? explode(':', $job_id, 2) : ['task_job', $job_id];
+    if (!$this->entityTypeManager->hasDefinition($type) || !is_a($this->entityTypeManager->getDefinition($type)->getClass(), JobInterface::class, TRUE)) {
+      return NULL;
+    }
+    $job = $this->entityTypeManager->getStorage($type)->load($entity_id);
+    if (!$job || !$job->access('update')) {
+      return NULL;
+    }
 
     // Get from the job tempstore if appropriate.
     $job = $this->jobTempstoreRepository->get($job);
@@ -181,7 +189,7 @@ class JobTrigger extends PluginBase implements BlueprintProviderInterface, Conta
     $job = $blueprint_storage->getJob();
     $trigger = $blueprint_storage->getTrigger();
 
-    return "{$job->id()}.{$trigger->getKey()}";
+    return "{$job->getEntityTypeId()}:{$job->id()}.{$trigger->getKey()}";
   }
 
   /**

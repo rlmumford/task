@@ -9,6 +9,7 @@ use Drupal\Core\Render\Element;
 use Drupal\task\Event\CollectResourcesEvent;
 use Drupal\task\Event\TaskEvents;
 use Drupal\task\TaskInterface;
+use Drupal\task_job\TaskJobResolver;
 use Drupal\task\TaskResourceManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -24,9 +25,12 @@ class CollectResourcesSubscriber implements EventSubscriberInterface {
    *
    * @param \Drupal\task\TaskResourceManagerInterface $resourceManager
    *   Builds task resources with their configured contexts and access checks.
+   * @param \Drupal\task_job\TaskJobResolver $jobs
+   *   Resolves the task’s saved job definition.
    */
   public function __construct(
     protected TaskResourceManagerInterface $resourceManager,
+    protected TaskJobResolver $jobs,
   ) {}
 
   /**
@@ -47,7 +51,7 @@ class CollectResourcesSubscriber implements EventSubscriberInterface {
    */
   public function collectResources(CollectResourcesEvent $event) {
     /** @var \Drupal\task_job\JobInterface $job */
-    $job = $event->getTask()->job->entity;
+    $job = $this->jobs->resolve($event->getTask());
     if (!$job) {
       return;
     }

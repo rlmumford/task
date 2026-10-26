@@ -73,7 +73,7 @@ class JobAddResourceForm extends JobPluginFormBase {
     PluginManagerInterface $manager,
     ConfigFactoryInterface $config_factory,
     EventDispatcherInterface $event_dispatcher,
-    EntityTypeManagerInterface $entity_type_manager
+    EntityTypeManagerInterface $entity_type_manager,
   ) {
     parent::__construct($tempstore_repository, $plugin_form_factory, $manager, $config_factory);
 
@@ -105,7 +105,7 @@ class JobAddResourceForm extends JobPluginFormBase {
       'id' => $block->getPluginId(),
       'uuid' => $uuid,
     ] + $block->getConfiguration();
-    $job->set('resources', $resources);
+    $job->setDefinitionValue('resources', $resources);
     $job->getResourcesCollection()->setConfiguration($job->getResourcesConfiguration());
 
     $this->tempstoreRepository->set($job);
@@ -116,9 +116,7 @@ class JobAddResourceForm extends JobPluginFormBase {
    */
   protected function gatherContexts(JobInterface $task_job) {
     /** @var \Drupal\task\Entity\Task $tmp_task */
-    $tmp_task = $this->entityTypeManager->getStorage('task')->create([
-      'job' => $task_job,
-    ]);
+    $tmp_task = $this->entityTypeManager->getStorage('task')->create($task_job->getTaskValues());
     $event = new CollectResourcesContextsEvent($tmp_task);
     $this->eventDispatcher->dispatch($event, TaskEvents::COLLECT_RESOURCES_CONTEXTS);
 

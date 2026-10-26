@@ -92,7 +92,7 @@ abstract class JobPluginFormBase extends FormBase {
     $form_state->set('configured_plugin', $plugin);
 
     $form_state->setTemporaryValue('gathered_contexts', $this->gatherContexts($job));
-    $form_state->setTemporaryValue('checklist_templates', $job->get('checklist_templates') ?: []);
+    $form_state->setTemporaryValue('checklist_templates', $job->getDefinitionValue('checklist_templates') ?: []);
     $definitions = [];
     foreach ($job->getContextDefinitions() as $name => $definition) {
       $definitions['task_context:' . $name] = (clone $definition)->setRequired(FALSE);

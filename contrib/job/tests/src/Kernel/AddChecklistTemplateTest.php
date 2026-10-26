@@ -151,7 +151,10 @@ class AddChecklistTemplateTest extends KernelTestBase {
     $versions = $this->container->get('task_job.version_resolver');
     $six = $versions->createVersion($job, '6');
     $six->save();
-    $task = Task::create(['title' => 'Title input', 'job' => $job, 'job_version' => '6']);
+    $task = Task::create([
+      'title' => 'Title input',
+      'job' => ['target_type' => 'task_job', 'target_id' => $job->getBaseJobId(), 'version' => '6'],
+    ]);
     $task->save();
     foreach ($task->checklist->checklist->getItems() as $item) {
       $item->save();
@@ -189,7 +192,10 @@ class AddChecklistTemplateTest extends KernelTestBase {
     $versions = $this->container->get('task_job.version_resolver');
     $six = $versions->createVersion($job, '6');
     $six->save();
-    $task = Task::create(['title' => 'Title input', 'job' => $job, 'job_version' => '6']);
+    $task = Task::create([
+      'title' => 'Title input',
+      'job' => ['target_type' => 'task_job', 'target_id' => $job->getBaseJobId(), 'version' => '6'],
+    ]);
     $task->get('context')->set('documents', ['Passport']);
     $task->save();
     foreach ($task->checklist->checklist->getItems() as $item) {

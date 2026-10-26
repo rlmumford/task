@@ -191,7 +191,9 @@ class JobTriggerManager extends DefaultPluginManager implements JobTriggerManage
    */
   public function handleTrigger(string $plugin_id, array $context_values, bool $save = TRUE) : array {
     $tasks = [];
-    foreach ($this->getTriggers($plugin_id) as $trigger) {
+    $triggers = $this->getTriggers($plugin_id);
+    $this->moduleHandler->alter('task_job_triggers', $triggers, $plugin_id, $context_values);
+    foreach ($triggers as $trigger) {
       foreach ($trigger->getContextDefinitions() as $name => $definition) {
         // Cached trigger instances must not retain a previous event's values.
         $trigger->setContextValue($name, $context_values[$name] ?? NULL);

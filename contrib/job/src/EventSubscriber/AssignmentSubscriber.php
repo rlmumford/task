@@ -5,7 +5,7 @@ namespace Drupal\task_job\EventSubscriber;
 use Drupal\task\Event\SelectAssigneeEvent;
 use Drupal\task\Event\TaskEvents;
 use Drupal\task_job\AssignmentRules;
-use Drupal\task_job\JobVersionResolverInterface;
+use Drupal\task_job\TaskJobResolver;
 use Drupal\user\Entity\User;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -17,7 +17,7 @@ class AssignmentSubscriber implements EventSubscriberInterface {
   /**
    * Constructs the subscriber.
    */
-  public function __construct(protected JobVersionResolverInterface $versions, protected AssignmentRules $rules) {}
+  public function __construct(protected TaskJobResolver $jobs, protected AssignmentRules $rules) {}
 
   /**
    * {@inheritdoc}
@@ -31,17 +31,15 @@ class AssignmentSubscriber implements EventSubscriberInterface {
    */
   public function selectAssignee(SelectAssigneeEvent $event): void {
     $task = $event->getTask();
-    if (!$task->assignee->isEmpty() || $event->getAssignee() || $task->job->isEmpty()) {
+    if (!$task->assignee->isEmpty() || $event->getAssignee()) {
       return;
     }
-    $job = $task->get('job_version')->isEmpty()
-      ? $task->job->entity
-      : $this->versions->load($task->job->target_id, $task->get('job_version')->value);
+    $job = $this->jobs->resolve($task);
     if (!$job) {
       return;
     }
-    $contexts = $job->get('assignment_rules') ? $this->rules->contexts($job, $task) : [];
-    foreach ($job->get('assignment_rules') ?: [] as $rule) {
+    $contexts = $job->getDefinitionValue('assignment_rules') ? $this->rules->contexts($job, $task) : [];
+    foreach ($job->getDefinitionValue('assignment_rules') ?: [] as $rule) {
       if (!$this->rules->matches($rule, $contexts)) {
         continue;
       }

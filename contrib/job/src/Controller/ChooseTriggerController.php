@@ -2,10 +2,10 @@
 
 namespace Drupal\task_job\Controller;
 
+use Drupal\task_job\JobEditor;
 use Drupal\Core\Ajax\AjaxHelperTrait;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Form\FormBuilderInterface;
-use Drupal\Core\Url;
 use Drupal\task_job\Form\JobAddTriggerForm;
 use Drupal\task_job\JobInterface;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerManager;
@@ -56,7 +56,7 @@ class ChooseTriggerController extends ControllerBase {
   public function __construct(
     TaskJobTempstoreRepository $tempstore_repository,
     JobTriggerManager $manager,
-    FormBuilderInterface $form_builder
+    FormBuilderInterface $form_builder,
   ) {
     $this->manager = $manager;
     $this->formBuilder = $form_builder;
@@ -106,7 +106,7 @@ class ChooseTriggerController extends ControllerBase {
 
         $build[$category]['links']['#links'][] = [
           'title' => $definition['label'],
-          'url' => Url::fromRoute(
+          'url' => JobEditor::url($task_job,
             'task_job.trigger.add',
             [
               'task_job' => $task_job->id(),

@@ -2,6 +2,7 @@
 
 namespace Drupal\task_job\Plugin\JobTrigger;
 
+use Drupal\task_job\Plugin\EntityTemplate\Builder\JobTaskBuilder;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -54,7 +55,7 @@ abstract class JobTriggerBase extends PluginBase implements JobTriggerInterface,
     ContainerInterface $container,
     array $configuration,
     $plugin_id,
-    $plugin_definition
+    $plugin_definition,
   ) {
     return new static(
       $configuration,
@@ -84,7 +85,7 @@ abstract class JobTriggerBase extends PluginBase implements JobTriggerInterface,
     string $plugin_id,
     $plugin_definition,
     TemplateBuilderManager $builder_manager,
-    EventDispatcherInterface $event_dispatcher
+    EventDispatcherInterface $event_dispatcher,
   ) {
     $this->builderManager = $builder_manager;
     $this->eventDispatcher = $event_dispatcher;
@@ -128,9 +129,7 @@ abstract class JobTriggerBase extends PluginBase implements JobTriggerInterface,
    */
   public function createTask(): ?TaskInterface {
     /** @var \Drupal\task_job\Plugin\EntityTemplate\Builder\JobTaskBuilder $builder */
-    $builder = $this->builderManager->createInstance(
-      'task_job:' . $this->getJob()->id()
-    );
+    $builder = JobTaskBuilder::forJob($this->getJob());
 
     $parameters = $this->getContextValues();
     $parameters['job'] = $this->getJob();

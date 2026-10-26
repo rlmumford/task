@@ -2,12 +2,12 @@
 
 namespace Drupal\task_job\Controller;
 
+use Drupal\task_job\JobEditor;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityFormBuilderInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Url;
 use Drupal\entity_template\TemplateBuilderManager;
 use Drupal\task_job\Event\SelectJobEnvironmentDetectionEvent;
 use Drupal\task_job\Event\TaskJobEvents;
@@ -120,12 +120,16 @@ class TaskAddController extends ControllerBase {
     $cache->addCacheTags(['task_job_list', 'config:task_job_list']);
     $job_storage = $this->entityTypeManager->getStorage('task_job');
     /** @var \Drupal\task_job\JobInterface $job */
-    foreach ($job_storage->loadMultiple() as $job) {
+    $jobs = $job_storage->loadMultiple();
+    $this->moduleHandler()->alter('task_job_selection', $jobs, $cache);
+    foreach ($jobs as $job) {
       if ($job->isVersioned()) {
         continue;
       }
 
-      $job = $this->jobVersionResolver->loadLatest($job->id()) ?: $job;
+      if ($job->getEntityTypeId() === 'task_job') {
+        $job = $this->jobVersionResolver->loadLatest($job->id()) ?: $job;
+      }
       $cache->addCacheableDependency($job);
       if ($job->status() && $job->hasTrigger('manual')) {
         $route_name = 'task_job.task.add_form';
@@ -153,11 +157,11 @@ class TaskAddController extends ControllerBase {
             'description' => [
               '#type' => 'html_tag',
               '#tag' => 'p',
-              '#value' => $job->get('description') ?: '',
+              '#value' => $job->getDefinitionValue('description') ?: '',
             ],
             'link' => [
               '#type' => 'link',
-              '#url' => Url::fromRoute($route_name, $params),
+              '#url' => JobEditor::url($job, $route_name, $params),
               '#title' => $this->t('Select'),
               '#attributes' => [
                 'class' => ['button', 'button--small'],
@@ -208,16 +212,14 @@ class TaskAddController extends ControllerBase {
    *   The build form.
    */
   public function createTask(JobInterface $task_job, ?AccountInterface $assignee = NULL) {
-    $effective_job = $task_job->isVersioned()
+    $effective_job = $task_job->getEntityTypeId() !== 'task_job' || $task_job->isVersioned()
       ? $task_job
       : ($this->jobVersionResolver->loadLatest($task_job->id()) ?: $task_job);
-    $task = $effective_job->getTrigger('manual')->createTask();
-    if ($task) {
-      $task->set('job', $effective_job->getBaseJobId());
-      if ($effective_job->getVersion() !== NULL) {
-        $task->set('job_version', $effective_job->getVersion());
-      }
+    $this->moduleHandler()->alter('task_job_manual_job', $effective_job);
+    if (!$effective_job || !$effective_job->status() || !$effective_job->hasTrigger('manual') || !$effective_job->getTrigger('manual')->access()) {
+      throw new NotFoundHttpException();
     }
+    $task = $effective_job->getTrigger('manual')->createTask();
     if ($task && $assignee) {
       $task->assignee = $assignee->id();
     }

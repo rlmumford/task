@@ -2,6 +2,7 @@
 
 namespace Drupal\task_job\Controller;
 
+use Drupal\task_job\JobEditor;
 use Drupal\checklist\ChecklistContextCollectorInterface;
 use Drupal\checklist\ChecklistItemHandlerManager;
 use Drupal\checklist\ChecklistTypeManager;
@@ -10,7 +11,6 @@ use Drupal\Core\Ajax\AjaxHelperTrait;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Plugin\Context\ContextHandlerInterface;
-use Drupal\Core\Url;
 use Drupal\task_job\Form\JobAddChecklistItemForm;
 use Drupal\task_job\JobConfigurationChecklist;
 use Drupal\task_job\JobInterface;
@@ -157,7 +157,7 @@ class ChooseHandlerController extends ControllerBase {
 
         $build[$category]['links']['#links'][] = [
           'title' => $definition['label'],
-          'url' => Url::fromRoute(
+          'url' => JobEditor::url($task_job,
             'task_job.checklist_item.add',
             [
               'task_job' => $task_job->id(),

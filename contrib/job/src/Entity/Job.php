@@ -2,19 +2,13 @@
 
 namespace Drupal\task_job\Entity;
 
-use Drupal\Component\Plugin\LazyPluginCollection;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
-use Drupal\Core\Plugin\DefaultLazyPluginCollection;
 use Drupal\task_job\JobInterface;
-use Drupal\task_job\JobChecklistExpansion;
+use Drupal\task_job\JobDefinitionTrait;
 use Drupal\task_job\JobVersionId;
-use Drupal\task_job\Plugin\JobTrigger\JobTriggerInterface;
-use Drupal\task_job\Plugin\JobTrigger\LazyJobTriggerCollection;
-use Drupal\Core\Plugin\Context\ContextDefinition;
-use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
 
 /**
  * Entity class for the Job entity.
@@ -80,6 +74,36 @@ use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
  * @package Drupal\task_job\Entity
  */
 class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginCollectionInterface {
+  use JobDefinitionTrait;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getDefinitionValue(string $name): mixed {
+    return $this->get($name);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setDefinitionValue(string $name, mixed $value): static {
+    $this->set($name, $value);
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getTaskValues(): array {
+    return ['job' => $this];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getTaskQueryConditions(): array {
+    return ['job.target_type' => 'task_job', 'job.target_id' => $this->getBaseJobId()];
+  }
 
   /**
    * The named version of this job.
@@ -289,172 +313,6 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
   protected $context = [];
 
   /**
-   * Get the default checklist items for this job.
-   *
-   * @return array
-   *   An array of checklist item configuration keyed by the name.
-   *   Each item should have atleast the following keys:
-   *     - name - The name of the checklist itm
-   *     - label - The label of the checklist item
-   *     - handler - The handler plugin used for the checklist item.
-   *     - handler_configuration - The configuration to be passed to the plugin.
-   */
-  public function getChecklistItems(?string $template = NULL): array {
-    if ($template === NULL) {
-      return $this->get('default_checklist') ?: [];
-    }
-    $templates = $this->get('checklist_templates') ?: [];
-    if (!isset($templates[$template])) {
-      throw new \InvalidArgumentException(sprintf('Checklist template "%s" does not exist.', $template));
-    }
-    return $templates[$template]['items'] ?? [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setChecklistItems(array $items, ?string $template = NULL): void {
-    if ($template === NULL) {
-      $this->set('default_checklist', $items);
-      return;
-    }
-    $this->getChecklistItems($template);
-    $templates = $this->get('checklist_templates');
-    $templates[$template]['items'] = $items;
-    $this->set('checklist_templates', $templates);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getExpandedChecklistItems(): array {
-    $items = $this->getChecklistItems();
-    $seen = [];
-    foreach ($this->get('checklist_includes') ?: [] as $template) {
-      if (isset($seen[$template])) {
-        throw new \InvalidArgumentException(sprintf('Checklist template "%s" is included more than once.', $template));
-      }
-      $seen[$template] = TRUE;
-      foreach ($this->getChecklistItems($template) as $name => $item) {
-        if (isset($items[$name])) {
-          throw new \InvalidArgumentException(sprintf('Checklist item "%s" occurs more than once after including template "%s".', $name, $template));
-        }
-        $items[$name] = $item;
-      }
-    }
-    return JobChecklistExpansion::expand($items, $this->get('checklist_templates') ?: []);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getResourcesConfiguration(): array {
-    return $this->get('resources') ?: [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getResourcesCollection(): LazyPluginCollection {
-    if (!$this->resourcesCollection) {
-      $this->resourcesCollection = new DefaultLazyPluginCollection(
-        \Drupal::service('plugin.manager.block'),
-        $this->getResourcesConfiguration()
-      );
-    }
-
-    return $this->resourcesCollection;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getTriggersConfiguration(): array {
-    return $this->get('triggers') ?: [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function defaultTriggersConfiguration(): array {
-    return [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getTriggerCollection(): LazyPluginCollection {
-    if (!$this->triggerCollection) {
-      $this->triggerCollection = new LazyJobTriggerCollection(
-        $this,
-        \Drupal::service('plugin.manager.task_job.trigger'),
-        $this->getTriggersConfiguration() ?: $this->defaultTriggersConfiguration()
-      );
-    }
-
-    return $this->triggerCollection;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getTrigger(string $key): ?JobTriggerInterface {
-    return $this->getTriggerCollection()->get($key);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function hasTrigger(string $key): bool {
-    $triggers = $this->getTriggersConfiguration();
-    return isset($triggers[$key]);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getContextDefinitions() {
-    $definitions = [];
-
-    foreach ($this->context as $key => $context) {
-      $definitions[$key] = ContextDefinition::create($context['type'])
-        ->setLabel($context['label'])
-        ->setRequired($context['required'] ?? TRUE)
-        ->setMultiple($context['multiple'] ?? FALSE)
-        ->setDescription($context['description'] ?? '');
-    }
-
-    return $definitions;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getContextDefinition(string $key) {
-    return $this->getContextDefinitions()[$key] ?? NULL;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function addContextDefinition(string $key, ContextDefinitionInterface $context_definition) {
-    $this->context[$key] = [
-      'type' => $context_definition->getDataType(),
-      'label' => (string) $context_definition->getLabel(),
-      'required' => $context_definition->isRequired(),
-      'multiple' => $context_definition->isMultiple(),
-      'description' => (string) $context_definition->getDescription(),
-    ];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function removeContextDefinition(string $key) {
-    unset($this->context[$key]);
-  }
-
-  /**
    * {@inheritdoc}
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE) {
@@ -497,9 +355,9 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
         }
       }
     }
-    $conditions = array_filter(array_column($this->get('assignment_rules') ?: [], 'condition'));
-    $conditions = array_merge($conditions, array_filter(array_column($this->get('checklist_templates') ?: [], 'addition_condition')));
-    foreach ($this->get('checklist_templates') ?: [] as $template) {
+    $conditions = array_filter(array_column($this->getDefinitionValue('assignment_rules') ?: [], 'condition'));
+    $conditions = array_merge($conditions, array_filter(array_column($this->getDefinitionValue('checklist_templates') ?: [], 'addition_condition')));
+    foreach ($this->getDefinitionValue('checklist_templates') ?: [] as $template) {
       $conditions = array_merge($conditions, array_filter(array_column($template['exposures'] ?? [], 'condition')));
     }
     foreach (\Drupal::service('checklist.condition_evaluator')->calculateDependencies($conditions) as $type => $names) {
@@ -509,7 +367,7 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
     }
     $manager = \Drupal::service('plugin.manager.checklist_item_handler');
     $definitions = array_values($this->getChecklistItems());
-    foreach ($this->get('checklist_templates') ?: [] as $template) {
+    foreach ($this->getDefinitionValue('checklist_templates') ?: [] as $template) {
       $definitions = array_merge($definitions, array_values($template['items'] ?? []));
     }
     foreach ($definitions as $item) {

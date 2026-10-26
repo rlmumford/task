@@ -49,7 +49,7 @@ class JobAssignmentRuleForm extends FormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state, ?JobInterface $task_job = NULL, ?string $rule = NULL) {
     $job = $this->drafts->get($task_job);
-    $configured = $job->get('assignment_rules') ?: [];
+    $configured = $job->getDefinitionValue('assignment_rules') ?: [];
     if ($rule !== NULL && !isset($configured[$rule])) {
       throw new NotFoundHttpException();
     }
@@ -124,7 +124,7 @@ class JobAssignmentRuleForm extends FormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $job = $form_state->get('job');
-    $rules = $job->get('assignment_rules') ?: [];
+    $rules = $job->getDefinitionValue('assignment_rules') ?: [];
     $key = $form_state->get('rule') ?? $this->uuid->generate();
     $rules[$key] = [
       'label' => $form_state->getValue('label'),
@@ -133,7 +133,7 @@ class JobAssignmentRuleForm extends FormBase {
     if ($condition = $form_state->get('condition_configuration')) {
       $rules[$key]['condition'] = $condition;
     }
-    $job->set('assignment_rules', $rules);
+    $job->setDefinitionValue('assignment_rules', $rules);
     $this->drafts->set($job, 'assignment');
     $form_state->setRedirectUrl($this->drafts->getEditUrl($job));
   }

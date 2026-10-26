@@ -38,7 +38,7 @@ class JobForm extends EntityForm {
 
     $form['description'] = [
       '#type' => 'textarea',
-      '#default_value' => $this->entity->get('description') ?: '',
+      '#default_value' => $this->entity->getDefinitionValue('description') ?: '',
       '#title' => $this->t('Description'),
       '#description' => $this->t('A description for the job. This will appear on the page when a user is selecting which task template to use. Task documentation should be included in the task description or in the checklist.'),
     ];

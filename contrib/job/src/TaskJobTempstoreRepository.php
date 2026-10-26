@@ -16,6 +16,13 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 class TaskJobTempstoreRepository {
 
   /**
+   * Separates content IDs from configuration IDs in draft storage.
+   */
+  protected function key(JobInterface $job): string {
+    return $job->getEntityTypeId() . ':' . $job->id();
+  }
+
+  /**
    * Constructs the repository.
    */
   public function __construct(protected SharedTempStoreFactory $tempStoreFactory, protected EntityTypeManagerInterface $entities, protected BlueprintTempstoreRepository $blueprints, protected TemplateBlueprintProviderManager $providers) {}
@@ -26,7 +33,7 @@ class TaskJobTempstoreRepository {
   public function get(JobInterface $job): JobInterface {
     $entry = $this->entry($job);
     if ($entry === NULL && $job->isVersioned() && !$job->isDirty()) {
-      $dirty = $this->entities->getStorage('task_job')->load(JobVersionId::buildDirty($job->getBaseJobId(), $job->getVersion()));
+      $dirty = $this->entities->getStorage($job->getEntityTypeId())->load(JobVersionId::buildDirty($job->getBaseJobId(), $job->getVersion()));
       if ($dirty instanceof JobInterface) {
         $job = $dirty;
         $entry = $this->entry($job);
@@ -52,7 +59,7 @@ class TaskJobTempstoreRepository {
       }
     }
     if ($changed) {
-      $job->set('triggers', $configuration);
+      $job->setDefinitionValue('triggers', $configuration);
       $job->getTriggerCollection()->setConfiguration($configuration);
       $this->set($job);
     }
@@ -73,7 +80,7 @@ class TaskJobTempstoreRepository {
     $entry = $this->entry($job);
     $new = $entry === NULL;
     $entry ??= [
-      'original' => $this->entities->getStorage('task_job')->loadUnchanged($job->id())?->toArray(),
+      'original' => $this->entities->getStorage($job->getEntityTypeId())->loadUnchanged($job->id())?->toArray(),
       'section' => 'checklist',
     ];
     $entry['job'] = $job;
@@ -81,7 +88,7 @@ class TaskJobTempstoreRepository {
     if ($section === 'templates') {
       $entry['template'] = $template;
     }
-    if (!$this->store()->setIfOwner($job->id(), $entry)) {
+    if (!$this->store()->setIfOwner($this->key($job), $entry)) {
       throw new AccessDeniedHttpException('This job is being edited by another user.');
     }
     if ($new) {
@@ -98,7 +105,7 @@ class TaskJobTempstoreRepository {
    */
   public function isCurrent(JobInterface $job): bool {
     $entry = $this->entry($job);
-    $current = $this->entities->getStorage('task_job')->loadUnchanged($job->id());
+    $current = $this->entities->getStorage($job->getEntityTypeId())->loadUnchanged($job->id());
     return $entry !== NULL && array_key_exists('original', $entry) && $current?->toArray() === $entry['original'];
   }
 
@@ -117,7 +124,7 @@ class TaskJobTempstoreRepository {
     foreach ($draft->getTriggerCollection() as $trigger) {
       $this->blueprints->delete($this->blueprintStorage($draft, $trigger));
     }
-    $this->store()->deleteIfOwner($job->id());
+    $this->store()->deleteIfOwner($this->key($job));
   }
 
   /**
@@ -126,19 +133,19 @@ class TaskJobTempstoreRepository {
   public function getEditUrl(JobInterface $job, ?string $section = NULL, ?string $template = NULL): Url {
     $section ??= $this->entry($job)['section'] ?? 'checklist';
     $template ??= $this->entry($job)['template'] ?? NULL;
-    if ($section === 'templates' && $template !== NULL && isset(($job->get('checklist_templates') ?: [])[$template])) {
-      return Url::fromRoute('entity.task_job.edit_template', ['task_job' => $job->id(), 'template' => $template]);
+    if ($section === 'templates' && $template !== NULL && isset(($job->getDefinitionValue('checklist_templates') ?: [])[$template])) {
+      return JobEditor::url($job, 'entity.task_job.edit_template', ['task_job' => $job->id(), 'template' => $template]);
     }
     $route = $section === 'checklist' ? 'entity.task_job.edit_form' : 'entity.task_job.edit_' . $section;
-    return Url::fromRoute($route, ['task_job' => $job->id()]);
+    return JobEditor::url($job, $route, ['task_job' => $job->id()]);
   }
 
   /**
    * Loads metadata only for the owner; never exposes another user's draft.
    */
   protected function entry(JobInterface $job): ?array {
-    $entry = $this->store()->getIfOwner($job->id());
-    if ($entry === NULL && $this->store()->getMetadata($job->id())) {
+    $entry = $this->store()->getIfOwner($this->key($job));
+    if ($entry === NULL && $this->store()->getMetadata($this->key($job))) {
       throw new AccessDeniedHttpException('This job is being edited by another user.');
     }
     return $entry;

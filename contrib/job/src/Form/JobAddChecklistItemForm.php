@@ -221,7 +221,7 @@ class JobAddChecklistItemForm extends JobPluginFormBase {
         $candidate->getExpandedChecklistItems();
         // Also validate a template not yet referenced by the main checklist.
         if ($template !== NULL) {
-          JobChecklistExpansion::expand($items, $candidate->get('checklist_templates') ?: []);
+          JobChecklistExpansion::expand($items, $candidate->getDefinitionValue('checklist_templates') ?: []);
         }
       }
       catch (\InvalidArgumentException $exception) {

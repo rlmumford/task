@@ -90,9 +90,12 @@ class RetargetDependencies extends TriggerActionBase implements ContainerFactory
       return [];
     }
     $tasks = $this->entities->getStorage('task');
-    $ids = $tasks->getQuery()->accessCheck(FALSE)
-      ->condition('uuid', array_values(array_unique($owners)), 'IN')
-      ->condition('job', $trigger->getJob()->getBaseJobId())->execute();
+    $query = $tasks->getQuery()->accessCheck(FALSE)
+      ->condition('uuid', array_values(array_unique($owners)), 'IN');
+    foreach ($trigger->getJob()->getTaskQueryConditions() as $field => $value) {
+      $query->condition($field, $value);
+    }
+    $ids = $query->execute();
     $eligible = [];
     foreach ($tasks->loadMultiple($ids) as $task) {
       if (!in_array($task->get('status')->value, ['resolved', 'closed'], TRUE)) {

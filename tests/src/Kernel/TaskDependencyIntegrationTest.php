@@ -79,7 +79,7 @@ class TaskDependencyIntegrationTest extends TaskDependencyTest {
     $job->save();
     $document = EntityTest::create(['name' => 'requested']);
     $document->save();
-    $tasks = $this->container->get('entity_type.manager')->getStorage('task')->loadByProperties(['job' => $job->id()]);
+    $tasks = $this->container->get('entity_type.manager')->getStorage('task')->loadByProperties($job->getTaskQueryConditions());
     $this->assertCount(1, $tasks);
     $task = reset($tasks);
     $this->assertSame('waiting', $task->status->value);
@@ -290,7 +290,7 @@ class TaskDependencyIntegrationTest extends TaskDependencyTest {
     $source->save();
     $source->resolve()->save();
     $source->save();
-    $tasks = $this->container->get('entity_type.manager')->getStorage('task')->loadByProperties(['job' => $job->id()]);
+    $tasks = $this->container->get('entity_type.manager')->getStorage('task')->loadByProperties($job->getTaskQueryConditions());
     $this->assertCount(1, $tasks);
   }
 

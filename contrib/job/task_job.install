@@ -6,6 +6,7 @@
  */
 
 use Drupal\task_job\Entity\Job;
+use Drupal\task_job\JobVersionId;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
@@ -71,72 +72,18 @@ function task_job_schema() {
  * Implements hook_install().
  */
 function task_job_install() {
-  /** @var \Drupal\Core\Field\FieldStorageDefinitionListenerInterface $storage_definition_listener */
-  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
-  /** @var \Drupal\Core\Field\FieldDefinitionListenerInterface $definition_listener */
-  $definition_listener = \Drupal::service('field_definition.listener');
-
-  $definition = BaseFieldDefinition::create('entity_reference')
-    ->setName('job')
-    ->setProvider('task_job')
-    ->setTargetEntityTypeId('task')
-    ->setLabel(new TranslatableMarkup('Job'))
-    ->setDescription(new TranslatableMarkup('The Job'))
-    ->setSetting('target_type', 'task_job')
-    ->setDisplayConfigurable('view', TRUE)
-    ->setDisplayConfigurable('form', TRUE);
-
-  $storage_definition_listener->onFieldStorageDefinitionCreate($definition);
-  $definition_listener->onFieldDefinitionCreate($definition);
-
-  $version_definition = BaseFieldDefinition::create('string')
-    ->setName('job_version')
-    ->setProvider('task_job')
-    ->setTargetEntityTypeId('task')
-    ->setLabel(new TranslatableMarkup('Job version'))
-    ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
-    ->setSetting('max_length', 128)
-    ->setInternal(TRUE)
-    ->setDisplayConfigurable('view', TRUE)
-    ->setDisplayConfigurable('form', TRUE);
-  $storage_definition_listener->onFieldStorageDefinitionCreate($version_definition);
-  $definition_listener->onFieldDefinitionCreate($version_definition);
+  $definition = \Drupal::service('entity_field.manager')->getFieldStorageDefinitions('task')['job'];
+  \Drupal::entityDefinitionUpdateManager()->installFieldStorageDefinition('job', 'task', 'task_job', $definition);
 }
 
 /**
  * Implements hook_uninstall().
  */
 function task_job_uninstall() {
-  /** @var \Drupal\Core\Field\FieldStorageDefinitionListenerInterface $storage_definition_listener */
-  $storage_definition_listener = \Drupal::service('field_storage_definition.listener');
-  /** @var \Drupal\Core\Field\FieldDefinitionListenerInterface $definition_listener */
-  $definition_listener = \Drupal::service('field_definition.listener');
-
-  $definition = BaseFieldDefinition::create('entity_reference')
-    ->setName('job')
-    ->setProvider('task_job')
-    ->setTargetEntityTypeId('task')
-    ->setLabel(new TranslatableMarkup('Job'))
-    ->setDescription(new TranslatableMarkup('The Job'))
-    ->setSetting('target_type', 'task_job')
-    ->setDisplayConfigurable('view', TRUE)
-    ->setDisplayConfigurable('form', TRUE);
-
-  $storage_definition_listener->onFieldStorageDefinitionDelete($definition);
-  $definition_listener->onFieldDefinitionDelete($definition);
-
-  $version_definition = BaseFieldDefinition::create('string')
-    ->setName('job_version')
-    ->setProvider('task_job')
-    ->setTargetEntityTypeId('task')
-    ->setLabel(new TranslatableMarkup('Job version'))
-    ->setDescription(new TranslatableMarkup('The named job version used by this task.'))
-    ->setSetting('max_length', 128)
-    ->setInternal(TRUE)
-    ->setDisplayConfigurable('view', TRUE)
-    ->setDisplayConfigurable('form', TRUE);
-  $storage_definition_listener->onFieldStorageDefinitionDelete($version_definition);
-  $definition_listener->onFieldDefinitionDelete($version_definition);
+  $manager = \Drupal::entityDefinitionUpdateManager();
+  if ($definition = $manager->getFieldStorageDefinition('job', 'task')) {
+    $manager->uninstallFieldStorageDefinition($definition);
+  }
 }
 
 /**
@@ -311,4 +258,69 @@ function task_job_update_8006() {
   }
   \Drupal::configFactory()->reset();
   \Drupal::entityTypeManager()->getStorage('task_job')->resetCache();
+}
+
+/**
+ * Combine configuration job and named version in one typed reference.
+ */
+function task_job_update_8007() {
+  $manager = \Drupal::entityDefinitionUpdateManager();
+  $installed = \Drupal::service('entity.last_installed_schema.repository')->getLastInstalledFieldStorageDefinitions('task');
+  $storage = \Drupal::entityTypeManager()->getStorage('task');
+  $database = \Drupal::database();
+  $schema = $database->schema();
+  $definition = \Drupal::service('entity_field.manager')->getFieldStorageDefinitions('task')['job'];
+  $mapping = $storage->getTableMapping($installed);
+  $table = $mapping->getFieldTableName('job');
+
+  if ($installed['job']->getType() !== 'task_job_reference') {
+    if ($storage->countFieldData($installed['job'], TRUE)) {
+      // Retain the old columns until both the copy and metadata update succeed.
+      // Retrying interrupted nontransactional DDL safely repeats the copy.
+      $new_mapping = $storage->getTableMapping(['job' => $definition] + $installed);
+      $columns = $new_mapping->getColumnNames('job');
+      foreach ($definition->getColumns() as $property => $specification) {
+        if (!$schema->fieldExists($table, $columns[$property])) {
+          $schema->addField($table, $columns[$property], $specification);
+        }
+      }
+      $old_column = $mapping->getFieldColumnName($installed['job'], 'target_id');
+      $copy = $database->update($table)
+        ->fields([$columns['target_type'] => 'task_job'])
+        ->expression($columns['target_id'], $old_column)
+        ->isNotNull($old_column);
+      if (isset($installed['job_version'])) {
+        $copy->expression($columns['version'], $mapping->getFieldColumnName($installed['job_version'], 'value'));
+      }
+      $copy->execute();
+      // Older callers sometimes stored the versioned config ID directly.
+      // Canonicalize those IDs so typed queries also find the migrated tasks.
+      $ids = $database->select($table, 't')->fields('t', [$old_column])
+        ->condition($old_column, '%--v%', 'LIKE')->distinct()->execute()->fetchCol();
+      foreach ($ids as $id) {
+        if ($parts = JobVersionId::parse($id)) {
+          $update = $database->update($table)->fields([
+            $columns['target_id'] => $parts['job_id'],
+            $columns['version'] => $parts['version'],
+          ])->condition($old_column, $id);
+          $update->condition($update->orConditionGroup()
+            ->isNull($columns['version'])->condition($columns['version'], $parts['version']))->execute();
+        }
+      }
+      $definition->setSetting('column_changes_handled', TRUE);
+    }
+    $manager->updateFieldStorageDefinition($definition);
+  }
+
+  // Only discard legacy storage after Drupal records the new reference schema.
+  // The original single-column reference was stored as task.job.
+  if ($schema->fieldExists($table, 'job')) {
+    $schema->dropField($table, 'job');
+  }
+  if (isset($installed['job_version'])) {
+    $column = $mapping->getFieldColumnName($installed['job_version'], 'value');
+    $database->update($table)->fields([$column => NULL])->execute();
+    $manager->uninstallFieldStorageDefinition($installed['job_version']);
+  }
+  $storage->resetCache();
 }

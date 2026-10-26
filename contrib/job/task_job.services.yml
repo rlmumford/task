@@ -9,7 +9,7 @@ services:
     arguments: ['@entity_type.manager']
   task_job.assignment_subscriber:
     class: Drupal\task_job\EventSubscriber\AssignmentSubscriber
-    arguments: ['@task_job.version_resolver', '@task_job.assignment_rules']
+    arguments: ['@task_job.resolver', '@task_job.assignment_rules']
     tags:
       - { name: event_subscriber }
   task_job.tempstore_repository:
@@ -17,7 +17,7 @@ services:
     arguments: ['@tempstore.shared', '@entity_type.manager', '@entity_template.blueprint_tempstore_repository', '@plugin.manager.entity_template.blueprint_provider']
   task_job.collect_resources_subscriber:
     class: Drupal\task_job\EventSubscriber\CollectResourcesSubscriber
-    arguments: ['@task.resource_manager']
+    arguments: ['@task.resource_manager', '@task_job.resolver']
     tags:
       - { name: event_subscriber }
   plugin.manager.task_job.trigger:
@@ -35,7 +35,7 @@ services:
 
   task_job.execution_authorization:
     class: Drupal\task_job\JobExecutionAuthorization
-    arguments: ['@keyvalue', '@current_user', '@entity_type.manager', '@config.storage', '@task_job.version_resolver', '@checklist.context_collector', '@context.handler', '@uuid', '@datetime.time']
+    arguments: ['@keyvalue', '@current_user', '@entity_type.manager', '@config.storage', '@task_job.resolver', '@checklist.context_collector', '@context.handler', '@uuid', '@datetime.time']
     tags:
       - { name: event_subscriber }
   task_job.template_contexts:
@@ -46,3 +46,7 @@ services:
   task_job.template_input_cardinality:
     class: Drupal\task_job\TemplateInputCardinality
     arguments: ['@typed_data_plus.data_fetcher', '@context.repository']
+
+  task_job.resolver:
+    class: Drupal\task_job\TaskJobResolver
+    arguments: ['@task_job.version_resolver', '@module_handler', '@entity_type.manager']

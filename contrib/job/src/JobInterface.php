@@ -3,14 +3,39 @@
 namespace Drupal\task_job;
 
 use Drupal\Component\Plugin\LazyPluginCollection;
-use Drupal\Core\Config\Entity\ConfigEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\task_job\Plugin\JobTrigger\JobTriggerInterface;
 use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
 
 /**
  * Interface for Jobs.
  */
-interface JobInterface extends ConfigEntityInterface {
+interface JobInterface extends EntityInterface {
+
+  /**
+   * Reads a job definition value independently of entity storage.
+   */
+  public function getDefinitionValue(string $name): mixed;
+
+  /**
+   * Changes a job definition value independently of entity storage.
+   */
+  public function setDefinitionValue(string $name, mixed $value): static;
+
+  /**
+   * Whether this job participates in new work.
+   */
+  public function status();
+
+  /**
+   * Initial task fields linking to this exact job definition.
+   */
+  public function getTaskValues(): array;
+
+  /**
+   * Query conditions selecting tasks of this logical job across its revisions.
+   */
+  public function getTaskQueryConditions(): array;
 
   /**
    * Get the version identifier for this job, if it is versioned.

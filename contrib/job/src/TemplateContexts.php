@@ -28,7 +28,7 @@ class TemplateContexts implements EventSubscriberInterface {
     if (!$checklist instanceof JobConfigurationChecklist || $checklist->template === NULL) {
       return;
     }
-    $templates = $checklist->getType()->getJob()->get('checklist_templates') ?: [];
+    $templates = $checklist->getType()->getJob()->getDefinitionValue('checklist_templates') ?: [];
     foreach (ChecklistContextMapping::definitions($templates[$checklist->template]['context'] ?? []) as $name => $definition) {
       $event->addContext($name, new Context($definition));
     }

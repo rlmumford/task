@@ -366,9 +366,8 @@ display:
           empty_zero: false
           hide_alter_empty: true
           click_sort_column: target_id
-          type: entity_reference_label
-          settings:
-            link: false
+          type: task_job_reference_label
+          settings: {  }
           group_column: target_id
           group_columns: {  }
           group_rows: true
@@ -500,7 +499,6 @@ display:
           title: ''
           default_argument_type: current_user
           default_argument_options: {  }
-          default_argument_skip_url: false
           summary_options:
             base_path: ''
             count: true

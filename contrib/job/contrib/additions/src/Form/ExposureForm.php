@@ -48,7 +48,7 @@ class ExposureForm extends FormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state, ?JobInterface $task_job = NULL, ?string $template = NULL, ?string $exposure = NULL) {
     $job = $this->drafts->get($task_job);
-    $templates = $job->get('checklist_templates') ?: [];
+    $templates = $job->getDefinitionValue('checklist_templates') ?: [];
     $buttons = AdditionDefinitions::exposures($templates[$template] ?? []);
     if (!isset($templates[$template]) || ($exposure !== NULL && !isset($buttons[$exposure]))) {
       throw new NotFoundHttpException();
@@ -150,7 +150,7 @@ class ExposureForm extends FormBase {
       return;
     }
     $name = trim($form_state->getValue('name'));
-    $template = $form_state->get('job')->get('checklist_templates')[$form_state->get('template')];
+    $template = $form_state->get('job')->getDefinitionValue('checklist_templates')[$form_state->get('template')];
     if (!preg_match('/^[a-z][a-z0-9_]*$/D', $name) || ($form_state->get('exposure') === NULL && isset(AdditionDefinitions::exposures($template)[$name]))) {
       $form_state->setError($form['name'], $this->t('Use a unique lowercase machine name for the button.'));
     }
@@ -163,7 +163,7 @@ class ExposureForm extends FormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $job = $this->drafts->get($form_state->get('job'));
-    $templates = $job->get('checklist_templates');
+    $templates = $job->getDefinitionValue('checklist_templates');
     $template = $form_state->get('template');
     $name = $form_state->get('exposure') ?? trim($form_state->getValue('name'));
     $buttons = AdditionDefinitions::exposures($templates[$template]);
@@ -180,7 +180,7 @@ class ExposureForm extends FormBase {
     }
     unset($templates[$template]['allow_addition'], $templates[$template]['addition_label'], $templates[$template]['addition_condition'], $templates[$template]['addition_context_mapping']);
     $templates[$template]['exposures'] = $buttons;
-    $job->set('checklist_templates', $templates);
+    $job->setDefinitionValue('checklist_templates', $templates);
     $this->drafts->set($job, 'templates', $template);
     $form_state->set('job', $job);
     $form_state->setRedirectUrl($this->drafts->getEditUrl($job));
