@@ -1,0 +1,13 @@
+workspace:
+  css:
+    component:
+      css/workspace.css: {}
+  js:
+    js/workspace.js: {}
+  dependencies:
+    - core/drupal
+    - core/jquery
+    - core/once
+    - core/drupalSettings
+    - core/drupal.ajax
+    - views/views.ajax

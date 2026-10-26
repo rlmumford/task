@@ -4,6 +4,7 @@ services:
     arguments: [ '@module_handler', '@event_dispatcher', '@task.readiness', '@entity_type.manager' ]
   task_checklist.task_checklist.subscriber:
     class: Drupal\task_checklist\EventSubscriber\TaskChecklistSubscriber
+    arguments: ['@entity_type.manager', '@database']
     tags:
       - { name: event_subscriber }
 

@@ -1,0 +1,304 @@
+langcode: en
+status: true
+dependencies:
+  module:
+  - task
+  - task_ui
+  - user
+  - options
+id: task_workspace
+label: Task workspace
+module: views
+description: Personal and team task lists for the work board.
+tag: Tasks
+base_table: task
+base_field: id
+display:
+  default:
+    id: default
+    display_plugin: default
+    display_title: Default
+    position: 0
+    display_options:
+      title: Tasks
+      access:
+        type: role
+        options:
+          role:
+            authenticated: authenticated
+      cache:
+        type: none
+      query:
+        type: views_query
+        options:
+          disable_sql_rewrite: false
+      use_ajax: true
+      pager:
+        type: full
+        options:
+          items_per_page: 25
+          id: 0
+          quantity: 5
+          tags:
+            next: "Next \u203A"
+            previous: "\u2039 Previous"
+            first: "\xAB First"
+            last: "Last \xBB"
+      exposed_form:
+        type: basic
+        options:
+          submit_button: Search
+          reset_button: true
+          exposed_sorts_label: Sort by
+          expose_sort_order: true
+      style:
+        type: table
+        options:
+          columns:
+            task_ui_open: task_ui_open
+            task_ui_state: task_ui_state
+            task_ui_assignee: task_ui_assignee
+            task_ui_context: task_ui_context
+            task_ui_due: task_ui_due
+            task_ui_deadline: task_ui_deadline
+            task_ui_actions: task_ui_actions
+          info:
+            task_ui_open:
+              sortable: true
+              default_sort_order: asc
+              empty_column: false
+            task_ui_state:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+            task_ui_assignee:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+            task_ui_context:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+            task_ui_due:
+              sortable: true
+              default_sort_order: asc
+              empty_column: false
+            task_ui_deadline:
+              sortable: true
+              default_sort_order: asc
+              empty_column: false
+            task_ui_actions:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+          default: '-1'
+      row:
+        type: fields
+      fields:
+        task_ui_open:
+          id: task_ui_open
+          table: task
+          field: task_ui_open
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Task
+        task_ui_state:
+          id: task_ui_state
+          table: task
+          field: task_ui_state
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Readiness
+        task_ui_assignee:
+          id: task_ui_assignee
+          table: task
+          field: task_ui_assignee
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Assigned to
+        task_ui_context:
+          id: task_ui_context
+          table: task
+          field: task_ui_context
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Context
+        task_ui_due:
+          id: task_ui_due
+          table: task
+          field: task_ui_due
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Due
+        task_ui_deadline:
+          id: task_ui_deadline
+          table: task
+          field: task_ui_deadline
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: External deadline
+        task_ui_actions:
+          id: task_ui_actions
+          table: task
+          field: task_ui_actions
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Actions
+      filters:
+        status:
+          id: status
+          table: task
+          field: status
+          plugin_id: list_field
+          operator: or
+          value:
+            active: active
+            pending: pending
+            waiting: waiting
+          exposed: false
+        title:
+          id: title
+          table: task
+          field: title
+          plugin_id: string
+          operator: contains
+          value: ''
+          exposed: true
+          expose:
+            operator_id: title_op
+            label: Task title
+            identifier: title
+            required: false
+      sorts:
+        id:
+          id: id
+          table: task
+          field: id
+          plugin_id: standard
+          order: DESC
+          exposed: false
+      empty:
+        area:
+          id: area
+          table: views
+          field: area_text_custom
+          plugin_id: text_custom
+          empty: true
+          content: No tasks in this queue.
+  mine:
+    id: mine
+    display_plugin: embed
+    display_title: Mine
+    position: 1
+    display_options:
+      defaults:
+        arguments: false
+      arguments:
+        assignee:
+          id: assignee
+          table: task
+          field: assignee
+          plugin_id: numeric
+          default_action: default
+          default_argument_type: current_user
+          default_argument_options: {}
+          validate:
+            type: none
+            fail: not found
+  team:
+    id: team
+    display_plugin: embed
+    display_title: Team
+    position: 2
+    display_options: {}
+  unassigned:
+    id: unassigned
+    display_plugin: embed
+    display_title: Unassigned
+    position: 3
+    display_options:
+      defaults:
+        filters: false
+        filter_groups: false
+      filters:
+        status:
+          id: status
+          table: task
+          field: status
+          plugin_id: list_field
+          operator: or
+          value:
+            active: active
+            pending: pending
+            waiting: waiting
+          exposed: false
+        title:
+          id: title
+          table: task
+          field: title
+          plugin_id: string
+          operator: contains
+          value: ''
+          exposed: true
+          expose:
+            operator_id: title_op
+            label: Task title
+            identifier: title
+            required: false
+        assignee:
+          id: assignee
+          table: task
+          field: assignee
+          plugin_id: numeric
+          operator: empty
+          value:
+            value: ''
+          exposed: false
+      filter_groups:
+        operator: AND
+        groups:
+          1: AND
+  history:
+    id: history
+    display_plugin: embed
+    display_title: History
+    position: 4
+    display_options:
+      defaults:
+        filters: false
+        filter_groups: false
+      filters:
+        status:
+          id: status
+          table: task
+          field: status
+          plugin_id: list_field
+          operator: or
+          value:
+            resolved: resolved
+            closed: closed
+          exposed: false
+        title:
+          id: title
+          table: task
+          field: title
+          plugin_id: string
+          operator: contains
+          value: ''
+          exposed: true
+          expose:
+            operator_id: title_op
+            label: Task title
+            identifier: title
+            required: false
+      filter_groups:
+        operator: AND
+        groups:
+          1: AND

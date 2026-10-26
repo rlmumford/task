@@ -3,6 +3,7 @@
 namespace Drupal\Tests\task\Kernel;
 
 use Drupal\checklist\Attempt\ChecklistAttempt;
+use Drupal\checklist\Event\ChecklistEvent;
 use Drupal\checklist\Execution\ChecklistItemIterationScheduler;
 use Drupal\checklist_state_test\Plugin\ChecklistItemHandler\SingleStep;
 use Drupal\Component\Datetime\TimeInterface;
@@ -62,6 +63,25 @@ class TaskChecklistWakeupTest extends KernelTestBase {
     $this->container->set('datetime.time', $time);
     SingleStep::$calls = [];
     SingleStep::$during = NULL;
+  }
+
+  /**
+   * Resolving an old browser snapshot preserves newer assignment and edits.
+   */
+  public function testCompletionPreservesCurrentTask(): void {
+    $task = $this->task();
+    $snapshot = clone $task;
+    $user = User::create(['name' => 'Assigned worker', 'status' => 1]);
+    $user->save();
+    $task->set('assignee', $user)->set('title', 'Updated work')->save();
+    $checklist = $snapshot->get('checklist')->first()->get('checklist')->getLocalValue();
+    $this->container->get('task_checklist.task_checklist.subscriber')
+      ->onTaskChecklistComplete(new ChecklistEvent($checklist));
+    $fresh = $this->container->get('entity_type.manager')->getStorage('task')->loadUnchanged($task->id());
+    $this->assertSame('resolved', $fresh->get('status')->value);
+    $this->assertSame('Updated work', $fresh->label());
+    $this->assertEquals($user->id(), $fresh->get('assignee')->target_id);
+    $this->assertSame('resolved', $snapshot->get('status')->value);
   }
 
   /**

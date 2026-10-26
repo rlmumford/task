@@ -1,0 +1,15 @@
+/* Keep navigation compact without changing the checklist's resource layout. */
+.task-work-navigation ul { display: flex; flex-wrap: wrap; gap: 1rem; list-style: none; padding: 0; }
+.task-work-summary { margin-block: 1rem; }
+.task-work-actions { display: flex; gap: 1rem; margin-block: 1rem; }
+.task-work-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+.task-work-queue { min-width: 0; overflow: auto; }
+.task-work-panel { min-width: 0; border-inline-start: 1px solid #aaa; padding-inline-start: 1rem; }
+.task-work-panel[hidden] { display: none; }
+@media (min-width: 70rem) {
+  .task-work-board--open .task-work-layout { grid-template-columns: minmax(18rem, 1fr) minmax(0, 2fr); }
+  .task-work-board--open .task-work-queue { max-height: 85vh; position: sticky; top: 1rem; align-self: start; }
+}
+@media (max-width: 69.99rem) {
+  .task-work-board--open .task-work-panel { grid-row: 1; border-inline-start: 0; padding-inline-start: 0; }
+}

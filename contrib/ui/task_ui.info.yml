@@ -1,0 +1,8 @@
+name: Task workspace
+type: module
+description: Optional personal and team queues with an interactive task workspace.
+package: Tasks
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task:task_checklist
+  - drupal:views

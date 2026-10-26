@@ -1,0 +1,3 @@
+views.field.task_ui_detail:
+  type: views_field
+  label: 'Task workspace detail'

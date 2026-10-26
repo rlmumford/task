@@ -1,0 +1,19 @@
+task_ui.tasks:
+  path: '/tasks'
+  defaults:
+    _controller: '\Drupal\task_ui\Controller\WorkController::listing'
+    _title: Tasks
+  requirements:
+    _user_is_logged_in: 'TRUE'
+
+task_ui.workspace:
+  path: '/task/{task}/workspace'
+  defaults:
+    _controller: '\Drupal\task_ui\Controller\WorkController::workspace'
+  requirements:
+    _entity_access: 'task.view'
+  options:
+    no_cache: TRUE
+    parameters:
+      task:
+        type: entity:task
