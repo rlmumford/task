@@ -15,6 +15,7 @@ Applications extend presentation with standard Drupal alter hooks:
 - `hook_task_ui_context_fields_alter(&$fields)`: opt single-valued entity-reference fields into list and task-summary columns (`field_name => translated label`).
 - `hook_task_ui_navigation_alter(&$links)`: add navigation links.
 - `hook_task_ui_task_actions_alter(&$actions, $task)`: add authorized render-array actions.
+- `hook_task_ui_task_summary_alter(&$content, $task)`: add read-only metadata to the task summary. It refreshes after board actions; do not put forms here.
 - `hook_task_ui_assignee_alter(&$label, $task)`: apply application-specific staff-label visibility.
 
 Organization membership and claim/reassignment actions belong to CounselKit's optional `ck_organization_task`. CMS owns its `/user` landing integration and filing/case fields. Installing the base task package alone does not enable these routes.

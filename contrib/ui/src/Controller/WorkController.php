@@ -75,10 +75,14 @@ final class WorkController extends ControllerBase {
         $rows[] = [$label, $this->presenter->reference($task->get($field)->entity)];
       }
     }
+    $content = [
+      'table' => ['#type' => 'table', '#rows' => $rows, '#attributes' => ['class' => ['task-work-summary']]],
+    ];
+    $this->moduleHandler()->alter('task_ui_task_summary', $content, $task);
     return [
       '#type' => 'container',
       '#attributes' => ['data-task-summary' => TRUE],
-      'table' => ['#type' => 'table', '#rows' => $rows, '#attributes' => ['class' => ['task-work-summary']]],
+      'content' => $content,
     ];
   }
 
@@ -92,7 +96,7 @@ final class WorkController extends ControllerBase {
     $response = new AjaxResponse();
     $response->headers->set('Cache-Control', 'private, no-store');
     if ($request->query->getBoolean('summary')) {
-      $response->addCommand(new HtmlCommand('#task-work-content [data-task-summary]', $this->summary($task)['table']));
+      $response->addCommand(new HtmlCommand('#task-work-content [data-task-summary]', $this->summary($task)['content']));
     }
     else {
       $build = $this->task($task);
