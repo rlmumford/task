@@ -1,0 +1,52 @@
+<?php
+
+/**
+ * @file
+ * Tests generic work relationships without the document module.
+ */
+
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\TypedData\EntityDataDefinition;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\TypedData\ListDataDefinition;
+use Drupal\Core\TypedData\DataReferenceDefinition;
+use Drupal\typed_data_reference\TypedDataReferenceItemList;
+
+/**
+ * Implements hook_entity_type_build().
+ */
+function task_related_test_entity_type_build(array &$types): void {
+  $types['entity_test']->set('task_related', TRUE);
+  $types['entity_test_rev']->set('task_related', TRUE);
+}
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function task_related_test_entity_base_field_info(EntityTypeInterface $type): array {
+  return $type->id() === 'task' ? [
+    'subject' => BaseFieldDefinition::create('entity_reference')->setLabel(t('Subject record'))->setSetting('target_type', 'entity_test'),
+  ] : [];
+}
+
+/**
+ * Implements hook_typed_data_reference_property_definitions_alter().
+ */
+function task_related_test_typed_data_reference_property_definitions_alter(array &$definitions, TypedDataReferenceItemList $field): void {
+  if (in_array($field->getName(), ['context', 'outcomes'], TRUE)) {
+    $definitions['record'] = EntityDataDefinition::create('entity_test')->setLabel(t('Created record'));
+    $definitions['records'] = ListDataDefinition::create('entity:entity_test')->setLabel(t('Created records'));
+    $definitions['revisioned'] = EntityDataDefinition::create('entity_test_rev')->setLabel(t('Reviewed record'));
+    $definitions['linked'] = DataReferenceDefinition::create('entity')->setTargetDefinition(EntityDataDefinition::create('entity_test'))->setLabel(t('Linked record'));
+    $definitions['role'] = EntityDataDefinition::create('user_role')->setLabel(t('Assigned role'));
+  }
+}
+
+/**
+ * Implements hook_entity_access().
+ */
+function task_related_test_entity_access(EntityInterface $entity, $operation): AccessResult {
+  return AccessResult::forbiddenIf($entity->label() === 'Hidden record')->setCacheMaxAge(0);
+}

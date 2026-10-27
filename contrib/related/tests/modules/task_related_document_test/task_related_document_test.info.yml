@@ -1,0 +1,7 @@
+name: Document task relationship fixtures
+type: module
+package: Testing
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task:task_related
+  - document:document

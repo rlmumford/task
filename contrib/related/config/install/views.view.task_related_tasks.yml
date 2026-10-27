@@ -1,0 +1,165 @@
+langcode: en
+status: true
+dependencies:
+  module:
+  - task
+  - task_ui
+  - user
+  - options
+  - task_related
+id: task_related_tasks
+label: Related tasks
+module: views
+description: Tasks with saved entity contexts or checklist outcomes.
+tag: Tasks
+base_table: task
+base_field: id
+display:
+  default:
+    id: default
+    display_plugin: default
+    display_title: Default
+    position: 0
+    display_options:
+      title: Related tasks
+      access:
+        type: role
+        options:
+          role:
+            authenticated: authenticated
+      cache:
+        type: none
+      query:
+        type: views_query
+        options:
+          disable_sql_rewrite: false
+      use_ajax: false
+      pager:
+        type: full
+        options:
+          items_per_page: 25
+          id: 3
+          quantity: 5
+          tags:
+            next: "Next \u203A"
+            previous: "\u2039 Previous"
+            first: "\xAB First"
+            last: "Last \xBB"
+      exposed_form:
+        type: basic
+        options:
+          submit_button: Search
+          reset_button: true
+          exposed_sorts_label: Sort by
+          expose_sort_order: true
+      style:
+        type: table
+        options:
+          columns:
+            task_ui_open: task_ui_open
+            task_ui_state: task_ui_state
+            task_ui_assignee: task_ui_assignee
+            task_ui_due: task_ui_due
+            task_related: task_related
+          info:
+            task_ui_open:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+            task_ui_state:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+            task_ui_assignee:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+            task_ui_due:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+            task_related:
+              sortable: false
+              default_sort_order: asc
+              empty_column: false
+          default: '-1'
+      row:
+        type: fields
+      fields:
+        task_ui_open:
+          id: task_ui_open
+          table: task
+          field: task_ui_open
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Task
+        task_ui_state:
+          id: task_ui_state
+          table: task
+          field: task_ui_state
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Readiness
+        task_ui_assignee:
+          id: task_ui_assignee
+          table: task
+          field: task_ui_assignee
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Assigned to
+        task_ui_due:
+          id: task_ui_due
+          table: task
+          field: task_ui_due
+          plugin_id: task_ui_detail
+          relationship: none
+          group_type: group
+          label: Due
+        task_related:
+          id: task_related
+          table: task
+          field: task_related
+          plugin_id: task_related
+          relationship: none
+          group_type: group
+          label: Relationship
+      filters: {}
+      sorts:
+        id:
+          id: id
+          table: task
+          field: id
+          plugin_id: standard
+          order: DESC
+          exposed: false
+      empty:
+        area:
+          id: area
+          table: views
+          field: area_text_custom
+          plugin_id: text_custom
+          empty: true
+          content: No related tasks for this record.
+      arguments:
+        task_related:
+          id: task_related
+          table: task
+          field: task_related
+          plugin_id: task_related
+          default_action: not found
+          exception:
+            value: ''
+            title_enable: false
+            title: All
+          validate:
+            type: none
+            fail: not found
+  embed:
+    id: embed
+    display_plugin: embed
+    display_title: Related tasks
+    position: 1
+    display_options: {}

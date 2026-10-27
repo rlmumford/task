@@ -1,0 +1,68 @@
+<?php
+
+/**
+ * @file
+ * Exposes saved contexts and outcomes on task and opted-in entity pages.
+ */
+
+use Drupal\Core\Entity\ContentEntityTypeInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\task\TaskInterface;
+
+/**
+ * Implements hook_entity_extra_field_info().
+ */
+function task_related_entity_extra_field_info(): array {
+  $fields = [];
+  foreach (\Drupal::entityTypeManager()->getDefinitions() as $type => $definition) {
+    if ($definition instanceof ContentEntityTypeInterface && $definition->get('task_related')) {
+      foreach (\Drupal::service('entity_type.bundle.info')->getBundleInfo($type) as $bundle => $info) {
+        $fields[$type][$bundle]['display']['related_tasks'] = [
+          'label' => t('Related tasks'),
+          'weight' => 30,
+          'visible' => TRUE,
+        ];
+      }
+    }
+  }
+  return $fields;
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function task_related_entity_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode): void {
+  if ($entity->getEntityType()->get('task_related') && $display->getComponent('related_tasks') && $entity->access('view')) {
+    $build['related_tasks'] = [
+      '#type' => 'details',
+      '#title' => t('Related tasks'),
+      '#open' => TRUE,
+      '#cache' => ['max-age' => 0],
+      'tasks' => [
+        '#type' => 'view',
+        '#name' => 'task_related_tasks',
+        '#display_id' => 'embed',
+        '#arguments' => [$entity->getEntityTypeId() . ':' . $entity->id()],
+      ],
+    ];
+  }
+}
+
+/**
+ * Implements hook_task_ui_task_summary_alter().
+ */
+function task_related_task_ui_task_summary_alter(array &$build, TaskInterface $task): void {
+  $build['related_records'] = \Drupal::service('task_related.presentation')->records($task);
+}
+
+/**
+ * Implements hook_views_data_alter().
+ */
+function task_related_views_data_alter(array &$data): void {
+  $data['task']['task_related'] = [
+    'title' => t('Related record'),
+    'argument' => ['id' => 'task_related', 'real field' => 'id'],
+    'field' => ['id' => 'task_related', 'real field' => 'id'],
+  ];
+}

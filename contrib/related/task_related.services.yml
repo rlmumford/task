@@ -1,0 +1,7 @@
+services:
+  task_related.work:
+    class: Drupal\task_related\RelatedWork
+    arguments: ['@database', '@entity_type.manager', '@entity_field.manager', '@typed_reference_index.references', '@typed_reference_index.index', '@plugin.manager.checklist_type', '@module_handler']
+  task_related.presentation:
+    class: Drupal\task_related\LinkPresentation
+    arguments: ['@task_related.work', '@entity_type.manager']

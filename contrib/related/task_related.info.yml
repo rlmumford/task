@@ -1,0 +1,9 @@
+name: Task context and outcome links
+type: module
+description: Related work through saved entity contexts and checklist outcomes.
+package: Tasks
+core_version_requirement: ^10 || ^11
+dependencies:
+  - task:task_context
+  - task:task_ui
+  - typed_reference_index:typed_reference_index

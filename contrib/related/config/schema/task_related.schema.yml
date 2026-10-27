@@ -1,0 +1,6 @@
+views.argument.task_related:
+  type: views_argument
+  label: Related entity type and ID
+views.field.task_related:
+  type: views_field
+  label: Contexts and outcomes

@@ -1,0 +1,34 @@
+<?php
+
+/**
+ * @file
+ * Typed reference fixtures, including collections and opaque integer values.
+ */
+
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\TypedData\EntityDataDefinition;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\TypedData\ListDataDefinition;
+use Drupal\Core\TypedData\MapDataDefinition;
+use Drupal\typed_data_reference\TypedDataReferenceItemList;
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function task_related_document_test_entity_base_field_info(EntityTypeInterface $type): array {
+  return $type->id() === 'task' ? ['input_document' => BaseFieldDefinition::create('entity_reference')->setSetting('target_type', 'document')->setRevisionable(TRUE)] : [];
+}
+
+/**
+ * Implements hook_typed_data_reference_property_definitions_alter().
+ */
+function task_related_document_test_typed_data_reference_property_definitions_alter(array &$definitions, TypedDataReferenceItemList $field): void {
+  if (in_array($field->getName(), ['context', 'outcomes'], TRUE)) {
+    $definitions['document'] ??= EntityDataDefinition::create('document');
+    $definitions['documents'] = ListDataDefinition::create('entity:document');
+    $definitions['packet'] = MapDataDefinition::create()
+      ->setPropertyDefinition('documents', ListDataDefinition::create('entity:document'))
+      ->setPropertyDefinition('number', DataDefinition::create('integer'));
+  }
+}

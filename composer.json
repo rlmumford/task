@@ -10,5 +10,8 @@
         "rlmumford/checklist": "2.x-dev",
         "php": ">=8.1",
         "drupal/typed_data_plus": "2.0.x-dev"
+    },
+    "suggest": {
+        "rlmumford/typed_reference_index": "Required by the task_related submodule."
     }
 }
