@@ -6,7 +6,7 @@ use Drupal\task\Event\SelectAssigneeEvent;
 use Drupal\task\Event\TaskEvents;
 use Drupal\task_job\AssignmentRules;
 use Drupal\task_job\TaskJobResolver;
-use Drupal\user\Entity\User;
+use Drupal\user\UserInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -44,7 +44,7 @@ class AssignmentSubscriber implements EventSubscriberInterface {
         continue;
       }
       $account = $this->rules->assignee($rule, $contexts);
-      if ($account instanceof User && $account->isAuthenticated() && $account->isActive()) {
+      if ($account instanceof UserInterface && $account->isAuthenticated() && $account->isActive()) {
         $event->setAssignee($account);
       }
       // First match wins, even if its account is missing or blocked.

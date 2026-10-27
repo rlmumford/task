@@ -369,3 +369,26 @@ the `task_job` parameter converted to their entity type and appropriate entity
 access requirements. Draft and nested blueprint keys include the entity type.
 Delegated execution approval for revisionable jobs is keyed by entity type, ID
 and revision; authoring does not bypass the separate authorization permission.
+
+## Assignee selectors
+
+Assignment rules may specify an `AssigneeSelector` plugin with `selector` and
+`selector_settings`. Existing rules without these keys continue to use
+`context_user` and their existing `context_mapping.assignee`. Conditions, rule
+ordering, explicit-assignee preservation and first-match semantics are unchanged.
+A matched selector returning NULL leaves the task unassigned.
+
+Implement `AssigneeSelectorInterface` (normally extend `AssigneeSelectorBase`)
+and annotate a class under `Plugin/AssigneeSelector`. A selector declares typed
+context inputs, supplies its configuration form, and implements
+`select(TaskInterface $task): ?UserInterface`. The shared rule editor exposes its
+configuration and mappings for both config and content job definitions. Switching
+selector types discards incompatible settings. Declare plugin-specific schema as
+`task_job.assignee_selector.PLUGIN_ID`. Config jobs record the provider dependency.
+
+Selection occurs only while persisting an unassigned task, within its SQL save
+transaction. A selector can therefore update a transactional cursor, but must
+never save the task recursively. Discovery, form rendering and dependency
+calculation instantiate plugins without calling `select()`. The runtime remains
+independent of organization and application-specific policies; CounselKit's
+organization-work-role module supplies one such extension.

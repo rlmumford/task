@@ -31,7 +31,7 @@ services:
     arguments: ['@task_job.tempstore_repository', '@current_route_match']
   task_job.assignment_rules:
     class: Drupal\task_job\AssignmentRules
-    arguments: ['@checklist.condition_evaluator', '@context.handler']
+    arguments: ['@checklist.condition_evaluator', '@context.handler', '@plugin.manager.task_job.assignee_selector']
 
   task_job.execution_authorization:
     class: Drupal\task_job\JobExecutionAuthorization
@@ -50,3 +50,7 @@ services:
   task_job.resolver:
     class: Drupal\task_job\TaskJobResolver
     arguments: ['@task_job.version_resolver', '@module_handler', '@entity_type.manager']
+
+  plugin.manager.task_job.assignee_selector:
+    class: Drupal\task_job\AssigneeSelectorManager
+    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler']

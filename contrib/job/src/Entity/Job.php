@@ -355,6 +355,10 @@ class Job extends ConfigEntityBase implements JobInterface, EntityWithPluginColl
         }
       }
     }
+    foreach ($this->getDefinitionValue('assignment_rules') ?: [] as $rule) {
+      $selector = \Drupal::service('task_job.assignment_rules')->selector($rule);
+      $this->addDependency('module', $selector->getPluginDefinition()['provider']);
+    }
     $conditions = array_filter(array_column($this->getDefinitionValue('assignment_rules') ?: [], 'condition'));
     $conditions = array_merge($conditions, array_filter(array_column($this->getDefinitionValue('checklist_templates') ?: [], 'addition_condition')));
     foreach ($this->getDefinitionValue('checklist_templates') ?: [] as $template) {

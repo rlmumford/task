@@ -20,7 +20,7 @@ class AssignmentRules {
   /**
    * Constructs the rule evaluator.
    */
-  public function __construct(protected ChecklistConditionEvaluator $conditions, protected ContextHandlerInterface $contextHandler) {}
+  public function __construct(protected ChecklistConditionEvaluator $conditions, protected ContextHandlerInterface $contextHandler, protected AssigneeSelectorManager $selectors) {}
 
   /**
    * Supplies definitions for authoring, or current values when a task is given.
@@ -65,14 +65,29 @@ class AssignmentRules {
    * Resolves a matched rule; missing values cannot trigger a different rule.
    */
   public function assignee(array $configuration, array $contexts): mixed {
-    $rule = new AssignmentRule($configuration);
+    $rule = $this->selector($configuration);
     try {
       $this->contextHandler->applyContextMapping($rule, $contexts);
-      return $rule->getContextValue('assignee');
+      return $rule->select($contexts['task']->getContextValue());
     }
     catch (MissingValueContextException) {
       return NULL;
     }
+  }
+
+  /**
+   * Creates the configured selector; older definitions retain their behavior.
+   */
+  public function selector(array $configuration): AssigneeSelectorInterface {
+    return $this->selectors->createInstance($configuration['selector'] ?? 'context_user',
+      ['context_mapping' => $configuration['context_mapping'] ?? []] + ($configuration['selector_settings'] ?? []));
+  }
+
+  /**
+   * Lists the selector types available to the shared job editor.
+   */
+  public function selectorOptions(): array {
+    return array_map(static fn(array $definition) => $definition['label'], $this->selectors->getDefinitions());
   }
 
 }

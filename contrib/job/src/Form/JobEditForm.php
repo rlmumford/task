@@ -239,7 +239,7 @@ class JobEditForm extends JobForm {
     ];
     $form['assignment_rules'] = [
       '#type' => 'table',
-      '#header' => [$this->t('Rule'), $this->t('Assignee context'), $this->t('Operations'), $this->t('Order')],
+      '#header' => [$this->t('Rule'), $this->t('Assignee selection'), $this->t('Operations'), $this->t('Order')],
       '#empty' => $this->t('No assignment rules. Tasks remain unassigned unless an assignee is explicitly supplied.'),
       '#tabledrag' => [['action' => 'order', 'relationship' => 'sibling', 'group' => 'assignment-rule-weight']],
     ];
@@ -249,7 +249,7 @@ class JobEditForm extends JobForm {
         '#attributes' => ['class' => ['draggable']],
         '#weight' => $weight,
         'label' => ['#plain_text' => $rule['label']],
-        'assignee' => ['#plain_text' => $rule['context_mapping']['assignee']],
+        'assignee' => ['#plain_text' => $rule['context_mapping']['assignee'] ?? \Drupal::service('task_job.assignment_rules')->selector($rule)->getPluginDefinition()['label']],
         'operations' => [
           '#type' => 'container',
           '#attributes' => ['class' => ['task-job-assignment-operations']],

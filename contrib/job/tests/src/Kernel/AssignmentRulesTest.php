@@ -25,7 +25,7 @@ class AssignmentRulesTest extends KernelTestBase {
     'entity', 'task', 'task_context', 'task_checklist', 'checklist',
     'task_job', 'entity_template', 'typed_data', 'typed_data_plus', 'views',
     'plugin_reference', 'typed_data_reference', 'typed_data_context_assignment',
-    'inline_entity_form',
+    'inline_entity_form', 'task_job_assignment_test',
   ];
 
   /**
@@ -218,6 +218,31 @@ class AssignmentRulesTest extends KernelTestBase {
     }
     task_job_update_8006();
     $this->assertCount(2, $storage->read('task_job.task_job.legacy')['assignment_rules']);
+  }
+
+  /**
+   * Extension selectors preserve first-match and explicit-assignee behavior.
+   */
+  public function testSelectorExtension(): void {
+    $user = User::create(['name' => 'Explicit assignee', 'status' => 1]);
+    $user->save();
+    $job = Job::create([
+      'id' => 'extension',
+      'label' => 'Extension',
+      'assignment_rules' => [
+      ['label' => 'No candidate', 'selector' => 'test_no_candidate'],
+      ['label' => 'Must not fall through', 'context_mapping' => ['assignee' => 'task.creator.entity']],
+      ],
+    ]);
+    $job->save();
+    $this->assertContains('task_job_assignment_test', $job->getDependencies()['module']);
+    $task = Task::create(['title' => 'No candidate', 'job' => $job, 'creator' => $user]);
+    $task->save();
+    $this->assertTrue($task->assignee->isEmpty());
+    $task->set('assignee', $user)->save();
+    $this->assertEquals($user->id(), $task->assignee->target_id);
+    $this->expectException(PluginNotFoundException::class);
+    $this->container->get('task_job.assignment_rules')->selector(['selector' => 'missing_selector']);
   }
 
 }

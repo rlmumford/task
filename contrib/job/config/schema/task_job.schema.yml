@@ -20,6 +20,12 @@ task_job.task_job.*:
           label:
             type: label
             label: 'Rule label'
+          selector:
+            type: string
+            label: 'Assignee selector'
+          selector_settings:
+            type: task_job.assignee_selector.[%parent.selector]
+            label: 'Selection settings'
           context_mapping:
             type: sequence
             label: 'Context mapping'
@@ -259,3 +265,8 @@ entity_template.component.plugin.task_context.data_select:
     selector:
       type: string
       label: 'Data selector'
+
+task_job.assignee_selector.context_user:
+  type: mapping
+  label: 'User from context'
+  mapping: {}
