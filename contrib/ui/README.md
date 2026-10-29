@@ -33,3 +33,16 @@ Organization membership and claim/reassignment actions belong to CounselKit's op
 ## Extensions
 
 An extension that changes task data through an AJAX form can append `TaskChangedCommand($task_id, $reload_panel)` to its response. `ck_organization_task` uses this after successful assignment in a Drupal dialog. The workspace decorates the form AJAX response builder to notify the board after existing checklist item forms; it adds an AJAX callback to the existing completion form while preserving that form's validation and submission. No parallel mutation API is introduced.
+
+## Filtering by service
+
+When the optional `service` module is enabled, the `Task service` Views filter
+(`task_ui_service`) offers an autocomplete across accessible service bundles.
+Applications can expose it in any task View; it is not added to existing Views
+automatically. It matches the task's own `service` reference before pagination.
+A service mentioned only in a checklist outcome or context is not the task's
+service, and does not match. No application-specific case type is required.
+
+The selection handler preserves query access and checks individual service view
+access; the SQL filter rechecks access to submitted IDs. Missing or inaccessible
+services return no tasks. The outer task View still applies normal task access.

@@ -5,3 +5,7 @@ views.field.task_ui_detail:
 views.filter.task_ui_assignee:
   type: views.filter.in_operator
   label: 'Task workspace assignee'
+
+views.filter.task_ui_service:
+  type: views.filter.string
+  label: 'Task workspace service'

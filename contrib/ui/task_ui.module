@@ -29,6 +29,13 @@ function task_ui_views_data_alter(array &$data): void {
     ];
   }
   $data['task']['task_ui_assignee']['filter'] = ['id' => 'task_ui_assignee', 'real field' => 'assignee'];
+  // Service adds this task field when enabled; task_ui also works without it.
+  if (\Drupal::moduleHandler()->moduleExists('service')) {
+    $data['task']['task_ui_service'] = [
+      'title' => t('Task service'),
+      'filter' => ['id' => 'task_ui_service', 'real field' => 'service'],
+    ];
+  }
 }
 
 /**
