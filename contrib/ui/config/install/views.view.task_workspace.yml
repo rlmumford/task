@@ -217,7 +217,53 @@ display:
     display_plugin: embed
     display_title: Team
     position: 2
-    display_options: {}
+    display_options:
+      defaults:
+        filters: false
+        filter_groups: false
+      filters:
+        status:
+          id: status
+          table: task
+          field: status
+          plugin_id: list_field
+          operator: or
+          value:
+            active: active
+            pending: pending
+            waiting: waiting
+          exposed: false
+        title:
+          id: title
+          table: task
+          field: title
+          plugin_id: string
+          operator: contains
+          value: ''
+          exposed: true
+          expose:
+            operator_id: title_op
+            label: Task title
+            identifier: title
+            required: false
+        task_ui_assignee:
+          id: task_ui_assignee
+          table: task
+          field: task_ui_assignee
+          plugin_id: task_ui_assignee
+          operator: in
+          value: []
+          exposed: true
+          expose:
+            operator_id: assignee_op
+            label: Assigned to
+            identifier: assignee
+            required: false
+            multiple: false
+      filter_groups:
+        operator: AND
+        groups:
+          1: AND
   unassigned:
     id: unassigned
     display_plugin: embed
@@ -298,6 +344,20 @@ display:
             label: Task title
             identifier: title
             required: false
+        task_ui_assignee:
+          id: task_ui_assignee
+          table: task
+          field: task_ui_assignee
+          plugin_id: task_ui_assignee
+          operator: in
+          value: []
+          exposed: true
+          expose:
+            operator_id: assignee_op
+            label: Assigned to
+            identifier: assignee
+            required: false
+            multiple: false
       filter_groups:
         operator: AND
         groups:

@@ -82,4 +82,58 @@ class WorkQueueTest extends KernelTestBase {
     }
   }
 
+  /**
+   * Assignee filtering precedes pagination and respects task and user access.
+   */
+  public function testAssigneeFilter(): void {
+    User::create(['uid' => 1, 'name' => 'root', 'status' => 1])->save();
+    Role::create([
+      'id' => 'worker',
+      'label' => 'Worker',
+      'permissions' => ['view assigned tasks', 'access user profiles'],
+    ])->save();
+    $worker = User::create(['name' => 'Worker', 'roles' => ['worker'], 'status' => 1]);
+    $worker->save();
+    $other = User::create(['name' => 'Other worker', 'status' => 1]);
+    $other->save();
+    $this->container->get('current_user')->setAccount($worker);
+    Task::create(['title' => 'Hidden work', 'assignee' => $other])->save();
+    for ($i = 0; $i < 26; $i++) {
+      Task::create(['title' => 'Assigned work ' . $i, 'assignee' => $worker])->save();
+    }
+    $view = Views::getView('task_workspace');
+    $view->setDisplay('team');
+    $view->setExposedInput(['assignee' => $worker->id()]);
+    $view->execute();
+    $this->assertCount(25, $view->result);
+    $this->assertEquals(26, $view->total_rows);
+    $options = $view->filter['task_ui_assignee']->getValueOptions();
+    $this->assertSame([(int) $worker->id() => 'Worker'], $options);
+
+    // A forged value cannot expand either task access or pager counts.
+    $view = Views::getView('task_workspace');
+    $view->setDisplay('team');
+    $view->setExposedInput(['assignee' => $other->id()]);
+    $view->execute();
+    $this->assertCount(0, $view->result);
+    $this->assertEquals(0, $view->total_rows);
+
+    $task = Task::create(['title' => 'Finished work', 'assignee' => $worker]);
+    $task->save();
+    $task->resolve()->save();
+    foreach (['team' => 0, 'history' => 1] as $display => $count) {
+      $view = Views::getView('task_workspace');
+      $view->setDisplay($display);
+      $view->setExposedInput(['assignee' => $worker->id(), 'title' => 'Finished']);
+      $view->execute();
+      $this->assertCount($count, $view->result);
+    }
+    foreach (['mine', 'unassigned'] as $display) {
+      $view = Views::getView('task_workspace');
+      $view->setDisplay($display);
+      $view->initHandlers();
+      $this->assertArrayNotHasKey('task_ui_assignee', $view->filter);
+    }
+  }
+
 }

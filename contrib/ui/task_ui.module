@@ -28,6 +28,7 @@ function task_ui_views_data_alter(array &$data): void {
       'field' => ['id' => 'task_ui_detail', 'component' => $component, 'real field' => $column],
     ];
   }
+  $data['task']['task_ui_assignee']['filter'] = ['id' => 'task_ui_assignee', 'real field' => 'assignee'];
 }
 
 /**
