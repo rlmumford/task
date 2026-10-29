@@ -1,0 +1,43 @@
+task_work_queue.settings:
+  type: config_object
+  label: 'Task work ordering'
+  mapping:
+    start_base:
+      type: float
+      label: 'Start date base urgency'
+    start_accumulation:
+      type: float
+      label: 'Start date urgency per day'
+    start_maximum:
+      type: float
+      label: 'Maximum start date urgency'
+    due_base:
+      type: float
+      label: 'Due date base urgency'
+    due_accumulation:
+      type: float
+      label: 'Due date urgency per day'
+    due_maximum:
+      type: float
+      label: 'Maximum due date urgency'
+    low_multiplier:
+      type: float
+      label: 'Low priority multiplier'
+    medium_multiplier:
+      type: float
+      label: 'Medium priority multiplier'
+    high_multiplier:
+      type: float
+      label: 'High priority multiplier'
+    waiting_multiplier:
+      type: float
+      label: 'Waiting task multiplier'
+    deadline_multiplier:
+      type: float
+      label: 'External deadline multiplier'
+    interrupt_grace:
+      type: integer
+      label: 'Deadline warning allowance in seconds'
+    maximum_tasks:
+      type: integer
+      label: 'Maximum tasks in a live ranking graph'

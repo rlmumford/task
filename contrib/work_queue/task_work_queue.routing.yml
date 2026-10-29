@@ -1,0 +1,10 @@
+task_work_queue.next:
+  path: '/tasks/next'
+  defaults:
+    _controller: '\Drupal\task_work_queue\Controller\NextTaskController::next'
+    _title: Next task
+  requirements:
+    _user_is_logged_in: 'TRUE'
+  methods: [GET]
+  options:
+    no_cache: TRUE

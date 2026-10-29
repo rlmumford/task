@@ -1,0 +1,50 @@
+<?php
+
+/**
+ * @file
+ * Task priority inputs and navigation to ordered personal work.
+ */
+
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Link;
+use Drupal\task\TaskInterface;
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function task_work_queue_entity_base_field_info(EntityTypeInterface $type): array {
+  if ($type->id() !== 'task') {
+    return [];
+  }
+  return [
+    'work_priority' => BaseFieldDefinition::create('list_string')
+      ->setLabel(t('Work priority'))->setDefaultValue('medium')
+      ->setSetting('allowed_values', ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'])
+      ->setDisplayConfigurable('form', TRUE),
+    'work_estimate' => BaseFieldDefinition::create('integer')
+      ->setLabel(t('Remaining work estimate (seconds)'))->setDefaultValue(0)
+      ->setSetting('min', 0)->setDisplayConfigurable('form', TRUE),
+    'work_interrupter' => BaseFieldDefinition::create('boolean')
+      ->setLabel(t('Interrupt planned work'))->setDefaultValue(FALSE)
+      ->setDisplayConfigurable('form', TRUE),
+  ];
+}
+
+/**
+ * Implements hook_task_ui_navigation_alter().
+ */
+function task_work_queue_task_ui_navigation_alter(array &$links): void {
+  array_unshift($links, Link::createFromRoute(t('Open next task'), 'task_work_queue.next'));
+}
+
+/**
+ * Implements hook_task_ui_task_summary_alter().
+ */
+function task_work_queue_task_ui_task_summary_alter(array &$content, TaskInterface $task): void {
+  if ((string) $task->get('assignee')->target_id === (string) \Drupal::currentUser()->id() && $task->access('view')) {
+    $content['next_work'] = Link::createFromRoute(t('Open next task'), 'task_work_queue.next', [], [
+      'query' => ['context' => $task->id()],
+    ])->toRenderable();
+  }
+}

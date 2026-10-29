@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * @file
+ * Installs the optional work-ordering inputs on existing task entities.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function task_work_queue_install(): void {
+  $manager = \Drupal::entityDefinitionUpdateManager();
+  $type = \Drupal::entityTypeManager()->getDefinition('task');
+  foreach (task_work_queue_entity_base_field_info($type) as $name => $definition) {
+    if (!$manager->getFieldStorageDefinition($name, 'task')) {
+      $manager->installFieldStorageDefinition($name, 'task', 'task_work_queue', $definition);
+    }
+  }
+}

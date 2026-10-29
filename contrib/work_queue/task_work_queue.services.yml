@@ -1,0 +1,4 @@
+services:
+  task_work_queue.selector:
+    class: Drupal\task_work_queue\NextTask
+    arguments: ['@entity_type.manager', '@current_user', '@task.readiness', '@datetime.time', '@config.factory']

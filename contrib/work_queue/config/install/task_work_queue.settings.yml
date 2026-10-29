@@ -1,0 +1,13 @@
+start_base: 10.0
+start_accumulation: 1.0
+start_maximum: 20.0
+due_base: 100.0
+due_accumulation: 10.0
+due_maximum: 200.0
+low_multiplier: 1.0
+medium_multiplier: 1.25
+high_multiplier: 1.5
+waiting_multiplier: 2.0
+deadline_multiplier: 2.0
+interrupt_grace: 900
+maximum_tasks: 5000
