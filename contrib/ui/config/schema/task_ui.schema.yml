@@ -9,3 +9,7 @@ views.filter.task_ui_assignee:
 views.filter.task_ui_service:
   type: views.filter.string
   label: 'Task workspace service'
+
+views.filter.task_ui_job:
+  type: views.filter.in_operator
+  label: 'Task workspace job'

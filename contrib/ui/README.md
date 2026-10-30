@@ -46,3 +46,26 @@ service, and does not match. No application-specific case type is required.
 The selection handler preserves query access and checks individual service view
 access; the SQL filter rechecks access to submitted IDs. Missing or inaccessible
 services return no tasks. The outer task View still applies normal task access.
+
+## Filtering by job
+
+With `task_job` enabled, the optional `Task job` Views filter (`task_ui_job`)
+selects the identity stored in `task.job`: entity type plus ID. All saved versions
+of that identity match. A shared job and a content override are separate choices,
+even when their machine names or IDs overlap. Filtering never resolves an override
+for an existing task or changes its pinned definition.
+
+Choices come from an access-checked aggregate task query, loading one representative
+task per identity. Both task and job-field read access are checked. The resolver
+validates the stored definition, including provider ownership checks. Its label
+identifies accessible work; no definition contents, catalogue entries or editor
+links are exposed, and job view/edit permissions are unchanged. Applications may
+qualify the label with `hook_task_ui_job_label_alter(&$label, $task, $job)`, called
+only after those checks. Remaining duplicate labels include entity type and ID.
+
+The filter runs before pagination and composes with the View's ordinary task
+access, queue, title, service and assignee restrictions. Invalid or stale choices
+remain selected with a neutral label and return no work. Choices are not cached
+across requests. Tasks without jobs are included when the filter is cleared.
+Applications add the filter to their own View configuration; existing customized
+Views are not rewritten by an update or request-time hook.
