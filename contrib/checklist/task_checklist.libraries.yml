@@ -1,0 +1,4 @@
+report:
+  css:
+    theme:
+      css/task-report.css: {}

@@ -1,0 +1,4 @@
+.task-report__summary, .task-report__context { display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin-block: 1rem; }
+.task-report__summary .form-item, .task-report__context .form-item { margin: 0; }
+.task-report__summary .field__label { font-size: .889rem; font-weight: 600; margin-block-end: .5rem; }
+.task-report .checklist-report { margin-block-start: 2rem; }

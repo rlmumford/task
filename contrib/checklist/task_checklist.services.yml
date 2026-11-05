@@ -20,3 +20,7 @@ services:
   task_checklist.request_runner:
     class: Drupal\task_checklist\TaskChecklistRequestRunner
     arguments: ['@task_checklist.request_storage', '@entity_type.manager', '@account_switcher', '@lock', '@task_checklist.task_processor']
+
+  task_checklist.report_builder:
+    class: Drupal\task_checklist\TaskReportBuilder
+    arguments: ['@checklist.report_builder', '@date.formatter']
