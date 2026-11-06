@@ -3,6 +3,7 @@
 namespace Drupal\Tests\task\Kernel;
 
 use Drupal\checklist\ChecklistActionResource;
+use Drupal\Core\Access\AccessResult;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Cache\Cache;
@@ -48,6 +49,32 @@ class TaskIntegrationTest extends KernelTestBase {
       $this->installEntitySchema($type);
     }
     $this->installConfig(['system', 'user']);
+  }
+
+  /**
+   * Report chips preserve access and omit denied or empty context.
+   */
+  public function testReportContextAccess(): void {
+    $account = User::create(['name' => 'report administrator', 'status' => 1]);
+    $account->save();
+    $this->container->get('current_user')->setAccount($account);
+    $task = Task::create(['title' => 'Read-only report', 'status' => 'resolved']);
+    $task->save();
+    $storage = $this->container->get('entity_type.manager')->getStorage('task');
+    $task = $storage->loadUnchanged($task->id());
+    $before = $task->toArray();
+    $build = $this->container->get('task_checklist.report_builder')->build($task, [
+      'visible' => ['#type' => 'item', '#title' => 'Source', '#plain_text' => 'Visible context'],
+      'denied' => ['#access' => AccessResult::forbidden(), '#plain_text' => 'Private context'],
+      'empty' => [],
+    ]);
+    $html = (string) $this->container->get('renderer')->renderInIsolation($build);
+    $this->assertStringContainsString('Visible context', $html);
+    $this->assertStringNotContainsString('Private context', $html);
+    $this->assertSame(1, substr_count($html, 'task-report__chip--context'));
+    $this->assertStringContainsString('Resolved', $html);
+    $this->assertStringNotContainsString('<form', $html);
+    $this->assertSame($before, $storage->loadUnchanged($task->id())->toArray());
   }
 
   /**

@@ -4,6 +4,7 @@ namespace Drupal\task_checklist;
 
 use Drupal\checklist\ChecklistReportBuilder;
 use Drupal\Core\Datetime\DateFormatterInterface;
+use Drupal\Core\Render\Element;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\task\TaskInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -45,6 +46,17 @@ final class TaskReportBuilder {
     if (!$task->access('view') || !$task->get('title')->access('view')) {
       throw new AccessDeniedHttpException();
     }
+    foreach (Element::children($context) as $key) {
+      if (($context[$key]['#type'] ?? NULL) === 'item') {
+        $context[$key]['#title_display'] = 'invisible';
+      }
+      $context[$key] = [
+        '#type' => 'container',
+        '#attributes' => ['class' => ['task-report__chip', 'task-report__chip--context']],
+        '#access' => $context[$key]['#access'] ?? (bool) $context[$key],
+        'content' => $context[$key],
+      ];
+    }
     $build = [
       '#type' => 'container',
       '#title' => $task->label(),
@@ -54,18 +66,46 @@ final class TaskReportBuilder {
       'summary' => [
         '#type' => 'container',
         '#attributes' => ['class' => ['task-report__summary']],
-        'identity' => ['#type' => 'item', '#title' => $this->t('Task'), '#plain_text' => '#' . $task->id()],
+        'identity' => [
+          '#type' => 'container',
+          '#attributes' => ['class' => ['task-report__chip', 'task-report__chip--identity']],
+          'label' => [
+            '#type' => 'html_tag',
+            '#tag' => 'span',
+            '#value' => $this->t('Task'),
+            '#attributes' => ['class' => ['visually-hidden']],
+          ],
+          'id' => ['#plain_text' => '#' . $task->id()],
+        ],
       ],
       'context' => ['#type' => 'container', '#attributes' => ['class' => ['task-report__context']]] + $context,
     ];
     if ($task->get('status')->access('view')) {
-      $build['summary']['status'] = $task->get('status')->view(['label' => 'above', 'type' => 'list_default']);
+      $build['summary']['status'] = [
+        '#type' => 'container',
+        '#attributes' => [
+          'class' => ['task-report__chip', 'task-report__chip--status'],
+          'data-status' => $task->get('status')->value,
+        ],
+        'field' => $task->get('status')->view(['label' => 'hidden', 'type' => 'list_default']),
+      ];
     }
     if ($task->get('created')->access('view')) {
       $build['summary']['created'] = [
-        '#type' => 'item',
-        '#title' => $this->t('Created'),
-        '#plain_text' => $this->dates->format($task->get('created')->value, 'custom', 'm/d/Y H:i T'),
+        '#type' => 'container',
+        '#attributes' => ['class' => ['task-report__chip', 'task-report__chip--created']],
+        'label' => [
+          '#type' => 'html_tag',
+          '#tag' => 'span',
+          '#value' => $this->t('Created'),
+          '#attributes' => ['class' => ['visually-hidden']],
+        ],
+        'date' => [
+          '#type' => 'html_tag',
+          '#tag' => 'time',
+          '#value' => $this->dates->format($task->get('created')->value, 'custom', 'm/d/Y H:i T'),
+          '#attributes' => ['datetime' => gmdate('c', $task->get('created')->value)],
+        ],
       ];
     }
     if (!$task->get('checklist')->isEmpty()) {
